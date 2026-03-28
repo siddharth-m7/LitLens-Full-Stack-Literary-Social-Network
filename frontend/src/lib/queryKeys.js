@@ -22,4 +22,6 @@ export const queryKeys = {
 
   // Follow
   followStatus: (userId) => ['followStatus', userId],
+  followers: (userId) => ['followers', userId],
+  following: (userId) => ['following', userId],
 };

@@ -119,30 +119,6 @@ export default function UserDashboard() {
           <p className="text-gray-500 mt-1">Discover books and share your thoughts with fellow readers</p>
         </div>
 
-        {/* Stats Bar */}
-        <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm p-5 mb-6">
-          <div className="flex items-center gap-8">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">{isLoading ? '—' : totalCount}</div>
-              <div className="text-sm text-gray-500 mt-0.5">Books Available</div>
-            </div>
-            <div className="w-px h-10 bg-[#E8E0CE]" />
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">
-                {books.reduce((acc, book) => acc + (book.reviews?.length || 0), 0)}
-              </div>
-              <div className="text-sm text-gray-500 mt-0.5">Reviews Loaded</div>
-            </div>
-            <div className="w-px h-10 bg-[#E8E0CE]" />
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">
-                {books.filter(book => book.averageRating >= 4).length}
-              </div>
-              <div className="text-sm text-gray-500 mt-0.5">Highly Rated</div>
-            </div>
-          </div>
-        </div>
-
         {/* Search & Filter Panel */}
         <div className="bg-white border border-[#E8E0CE] rounded-xl p-5 shadow-sm mb-6">
           <div className="flex flex-col gap-4">

@@ -117,6 +117,12 @@ export const toggleFollow = (userId) =>
 export const fetchFollowStatus = (userId) =>
   axios.get(`${BASE}/follow/${userId}/status`, { headers: authHeaders() }).then(r => r.data);
 
+export const fetchFollowers = (userId) =>
+  axios.get(`${BASE}/follow/${userId}/followers`).then(r => r.data);
+
+export const fetchFollowing = (userId) =>
+  axios.get(`${BASE}/follow/${userId}/following`).then(r => r.data);
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
 export const fetchLeaderboard = () =>

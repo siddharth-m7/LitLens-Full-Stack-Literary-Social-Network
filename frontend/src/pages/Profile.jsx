@@ -7,6 +7,8 @@ import {
   fetchProfile,
   fetchFavorites,
   fetchReadingList,
+  fetchFollowers,
+  fetchFollowing,
   updateReview,
   deleteReview,
 } from '../lib/api';
@@ -40,6 +42,7 @@ export default function Profile() {
 
   const [form, setForm] = useState({ rating: '', comment: '' });
   const [editingReviewId, setEditingReviewId] = useState(null);
+  const [followModal, setFollowModal] = useState(null); // 'followers' | 'following' | null
 
   const { data: profileData } = useQuery({
     queryKey: queryKeys.profile(),
@@ -48,6 +51,7 @@ export default function Profile() {
   });
 
   const {
+    _id: profileUserId,
     name: profileUserName,
     email: profileUserEmail,
     role: profileUserRole,
@@ -59,6 +63,18 @@ export default function Profile() {
     favorites = [],
     readingList = [],
   } = profileData ?? {};
+
+  const { data: followersList = [], isLoading: loadingFollowers } = useQuery({
+    queryKey: queryKeys.followers(profileUserId),
+    queryFn: () => fetchFollowers(profileUserId),
+    enabled: !!profileUserId && followModal === 'followers',
+  });
+
+  const { data: followingList = [], isLoading: loadingFollowing } = useQuery({
+    queryKey: queryKeys.following(profileUserId),
+    queryFn: () => fetchFollowing(profileUserId),
+    enabled: !!profileUserId && followModal === 'following',
+  });
 
   const profileUser = profileData
     ? { name: profileUserName, email: profileUserEmail, role: profileUserRole }
@@ -127,15 +143,21 @@ export default function Profile() {
                 </span>
                 {profileUser?.role === 'user' && (
                   <div className="flex items-center gap-4 mt-4">
-                    <div className="text-center">
+                    <button
+                      onClick={() => setFollowModal('followers')}
+                      className="text-center hover:opacity-70 transition-opacity"
+                    >
                       <div className="text-xl font-bold text-gray-900">{followerCount}</div>
                       <div className="text-gray-500 text-xs">Followers</div>
-                    </div>
+                    </button>
                     <div className="w-px h-8 bg-[#E8E0CE]" />
-                    <div className="text-center">
+                    <button
+                      onClick={() => setFollowModal('following')}
+                      className="text-center hover:opacity-70 transition-opacity"
+                    >
                       <div className="text-xl font-bold text-gray-900">{followingCount}</div>
                       <div className="text-gray-500 text-xs">Following</div>
-                    </div>
+                    </button>
                     <div className="w-px h-8 bg-[#E8E0CE]" />
                     <div className="text-center">
                       <div className="text-xl font-bold text-gray-900">{reviews.length}</div>
@@ -521,6 +543,91 @@ export default function Profile() {
           </div>
         )}
       </div>
+
+      {/* Followers / Following Modal */}
+      {followModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={() => setFollowModal(null)}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+
+          {/* Panel */}
+          <div
+            className="relative bg-white border border-[#E8E0CE] rounded-2xl shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E0CE]">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900 capitalize">{followModal}</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {followModal === 'followers' ? `${followerCount} follower${followerCount !== 1 ? 's' : ''}` : `${followingCount} following`}
+                </p>
+              </div>
+              <button
+                onClick={() => setFollowModal(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-[#F0EAD6] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto flex-1 px-4 py-3">
+              {(followModal === 'followers' ? loadingFollowers : loadingFollowing) ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-900 border-t-transparent" />
+                </div>
+              ) : (() => {
+                const list = followModal === 'followers' ? followersList : followingList;
+                const people = list.map(item =>
+                  followModal === 'followers' ? item.follower : item.following
+                ).filter(Boolean);
+
+                if (people.length === 0) {
+                  return (
+                    <div className="text-center py-10">
+                      <p className="text-gray-400 text-sm">
+                        {followModal === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-1">
+                    {people.map(person => (
+                      <Link
+                        key={person._id}
+                        to={`/users/${person._id}`}
+                        onClick={() => setFollowModal(null)}
+                        className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#F5EFE3] transition-colors group"
+                      >
+                        <div className="w-9 h-9 bg-[#F0EAD6] border border-[#DDD3B8] rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-gray-700">
+                            {person.name?.charAt(0)?.toUpperCase() || '?'}
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
+                          {person.name}
+                        </span>
+                        <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
