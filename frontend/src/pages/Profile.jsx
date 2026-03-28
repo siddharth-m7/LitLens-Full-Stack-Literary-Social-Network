@@ -138,49 +138,69 @@ export default function Profile() {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
 
         {/* Profile Header */}
-        <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden mb-8">
-          <div className="px-6 sm:px-8 py-8 border-b border-[#E8E0CE]">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
-              <div className="w-16 h-16 bg-[#F0EAD6] rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-2xl font-bold text-gray-700">
-                  {profileUser?.name?.charAt(0)?.toUpperCase() || '?'}
-                </span>
+        <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm mb-8">
+          <div className="p-6 sm:p-8">
+
+            {/* Top row: avatar + info */}
+            <div className="flex items-center gap-5">
+
+              {/* Avatar */}
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#A89070] to-[#6B5440] flex items-center justify-center shadow-md">
+                  <span className="text-3xl font-bold text-white select-none">
+                    {profileUser?.name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
+                </div>
+                {/* Online dot */}
+                <span className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-green-400 border-2 border-white rounded-full" />
               </div>
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold text-gray-900 mb-1">
-                  {profileUser?.name}'s Profile
-                </h1>
-                <p className="text-gray-500 text-sm mb-2">{profileUser?.email}</p>
-                <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                  {profileUser?.role}
-                </span>
-                {profileUser?.role === 'user' && (
-                  <div className="flex items-center gap-4 mt-4">
-                    <button
-                      onClick={() => setFollowModal('followers')}
-                      className="text-center hover:opacity-70 transition-opacity"
-                    >
-                      <div className="text-xl font-bold text-gray-900">{followerCount}</div>
-                      <div className="text-gray-500 text-xs">Followers</div>
+
+              {/* Name / email / role */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h1 className="text-xl font-bold text-gray-900 truncate">{profileUser?.name}</h1>
+                  <span className="inline-flex items-center gap-1 bg-[#F0EAD6] border border-[#DDD3B8] text-[#8B7355] text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#8B7355]" />
+                    {profileUser?.role}
+                  </span>
+                </div>
+                <p className="flex items-center gap-1.5 text-gray-400 text-sm mt-1 truncate">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  {profileUser?.email}
+                </p>
+              </div>
+            </div>
+
+            {/* Stats row */}
+            {profileUser?.role === 'user' && (
+              <div className="mt-6 pt-5 border-t border-[#E8E0CE] grid grid-cols-3 divide-x divide-[#E8E0CE]">
+                {[
+                  { label: 'Followers', value: followerCount, onClick: () => setFollowModal('followers'), clickable: true },
+                  { label: 'Following', value: followingCount, onClick: () => setFollowModal('following'), clickable: true },
+                  { label: 'Reviews',   value: reviews.length, clickable: false },
+                ].map(({ label, value, onClick, clickable }) => (
+                  clickable ? (
+                    <button key={label} onClick={onClick} className="group flex flex-col items-center gap-0.5 py-1 hover:bg-[#FAF6EE] rounded-lg transition-colors">
+                      <span className="text-2xl font-bold text-gray-900">{value}</span>
+                      <span className="text-xs text-gray-400 flex items-center gap-1">
+                        {label}
+                        <svg className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </span>
                     </button>
-                    <div className="w-px h-8 bg-[#E8E0CE]" />
-                    <button
-                      onClick={() => setFollowModal('following')}
-                      className="text-center hover:opacity-70 transition-opacity"
-                    >
-                      <div className="text-xl font-bold text-gray-900">{followingCount}</div>
-                      <div className="text-gray-500 text-xs">Following</div>
-                    </button>
-                    <div className="w-px h-8 bg-[#E8E0CE]" />
-                    <div className="text-center">
-                      <div className="text-xl font-bold text-gray-900">{reviews.length}</div>
-                      <div className="text-gray-500 text-xs">Reviews</div>
+                  ) : (
+                    <div key={label} className="flex flex-col items-center gap-0.5 py-1">
+                      <span className="text-2xl font-bold text-gray-900">{value}</span>
+                      <span className="text-xs text-gray-400">{label}</span>
                     </div>
-                  </div>
-                )}
+                  )
+                ))}
               </div>
-            </div>
-            </div>
+            )}
+          </div>
         </div>
 
         {profileUser?.role === 'admin' ? (

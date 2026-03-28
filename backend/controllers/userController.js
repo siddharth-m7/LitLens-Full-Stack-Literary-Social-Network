@@ -26,14 +26,17 @@ exports.getCurrentUser = async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const [reviewCount, earlyAdopterRank, topIds, followerCount, followingCount] = await Promise.all([
-      Review.countDocuments({ user: user._id }),
+    const [reviews, earlyAdopterRank, topIds, followerCount, followingCount] = await Promise.all([
+      Review.find({ user: user._id })
+        .populate('book', 'title author coverImage')
+        .sort({ createdAt: -1 }),
       User.countDocuments({ createdAt: { $lt: user.createdAt } }),
       getTopReviewerIds(),
       Follow.countDocuments({ following: user._id }),
       Follow.countDocuments({ follower: user._id }),
     ]);
 
+    const reviewCount = reviews.length;
     const badges = computeBadges({
       reviewCount,
       isEarlyAdopter: earlyAdopterRank < 50,
@@ -41,7 +44,7 @@ exports.getCurrentUser = async (req, res) => {
     });
     const milestones = computeMilestones(reviewCount);
 
-    res.json({ ...user.toObject(), reviewCount, followerCount, followingCount, badges, milestones });
+    res.json({ ...user.toObject(), reviews, reviewCount, followerCount, followingCount, badges, milestones });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
