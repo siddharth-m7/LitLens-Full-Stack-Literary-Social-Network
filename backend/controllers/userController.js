@@ -3,6 +3,9 @@ const Review = require('../models/Review');
 const Favorite = require('../models/Favorite');
 const ReadingList = require('../models/ReadingList');
 const Follow = require('../models/Follow');
+const Comment = require('../models/Comment');
+const ReviewLike = require('../models/ReviewLike');
+const Book = require('../models/Book');
 const { computeBadges, computeMilestones } = require('../utils/badgeUtils');
 
 // Helper: check if userId is in the top 10 reviewers for the current month
@@ -41,6 +44,47 @@ exports.getCurrentUser = async (req, res) => {
     res.json({ ...user.toObject(), reviewCount, followerCount, followingCount, badges, milestones });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+exports.deleteAccount = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // Collect books that had reviews from this user (for rating recalc)
+    const userReviews = await Review.find({ user: userId }).select('book').lean();
+    const affectedBookIds = [...new Set(userReviews.map(r => r.book?.toString()).filter(Boolean))];
+
+    // Delete all user data in parallel
+    await Promise.all([
+      User.findByIdAndDelete(userId),
+      Follow.deleteMany({ $or: [{ follower: userId }, { following: userId }] }),
+      Review.deleteMany({ user: userId }),
+      Favorite.deleteMany({ user: userId }),
+      ReadingList.deleteMany({ user: userId }),
+      Comment.deleteMany({ user: userId }),
+      ReviewLike.deleteMany({ user: userId }),
+    ]);
+
+    // Recalculate averageRating for affected books
+    if (affectedBookIds.length > 0) {
+      const ratings = await Review.aggregate([
+        { $match: { book: { $in: affectedBookIds.map(id => require('mongoose').Types.ObjectId.createFromHexString(id)) } } },
+        { $group: { _id: '$book', avg: { $avg: '$rating' } } },
+      ]);
+      const ratingMap = Object.fromEntries(ratings.map(r => [r._id.toString(), r.avg]));
+
+      const bulkOps = affectedBookIds.map(id => ({
+        updateOne: {
+          filter: { _id: id },
+          update: { $set: { averageRating: ratingMap[id] != null ? Math.round(ratingMap[id] * 10) / 10 : null } },
+        },
+      }));
+      await Book.bulkWrite(bulkOps);
+    }
+
+    res.json({ message: 'Account deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 

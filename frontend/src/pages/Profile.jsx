@@ -11,6 +11,7 @@ import {
   fetchFollowing,
   updateReview,
   deleteReview,
+  deleteAccount,
 } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -36,13 +37,14 @@ async function fetchFullProfile() {
 }
 
 export default function Profile() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const [form, setForm] = useState({ rating: '', comment: '' });
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [followModal, setFollowModal] = useState(null); // 'followers' | 'following' | null
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const { data: profileData } = useQuery({
     queryKey: queryKeys.profile(),
@@ -87,6 +89,17 @@ export default function Profile() {
       toast.success('Review updated');
     },
     onError: () => toast.error('Failed to update review'),
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: deleteAccount,
+    onSuccess: () => {
+      queryClient.clear();
+      logout();
+      navigate('/');
+      toast.success('Account deleted');
+    },
+    onError: () => toast.error('Failed to delete account'),
   });
 
   const deleteReviewMutation = useMutation({
@@ -167,7 +180,7 @@ export default function Profile() {
                 )}
               </div>
             </div>
-          </div>
+            </div>
         </div>
 
         {profileUser?.role === 'admin' ? (
@@ -540,9 +553,63 @@ export default function Profile() {
             </div>
           </div>
 
+          {/* Danger Zone */}
+          <div className="bg-white border border-red-100 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 sm:px-8 py-5 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Delete Account</h2>
+                <p className="text-gray-400 text-sm mt-0.5">
+                  Permanently removes your account, reviews, favorites, and all follow relationships.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="shrink-0 ml-6 border border-red-200 text-red-500 text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-50 hover:border-red-300 active:scale-[0.98] transition-all duration-150"
+              >
+                Delete account
+              </button>
+            </div>
+          </div>
+
           </div>
         )}
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div
+            className="relative bg-white border border-[#E8E0CE] rounded-2xl shadow-xl w-full max-w-sm p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-center w-12 h-12 bg-red-50 rounded-full mx-auto mb-4">
+              <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h2 className="text-base font-semibold text-gray-900 text-center mb-1">Delete your account?</h2>
+            <p className="text-sm text-gray-500 text-center mb-6">
+              This will permanently delete your account, all your reviews, favorites, and reading list. Your followers and following relationships will also be removed. This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-xl font-medium hover:bg-gray-900 hover:text-white transition-all duration-150"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { setShowDeleteModal(false); deleteAccountMutation.mutate(); }}
+                disabled={deleteAccountMutation.isPending}
+                className="flex-1 bg-red-500 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-red-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-50"
+              >
+                {deleteAccountMutation.isPending ? 'Deleting...' : 'Yes, delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Followers / Following Modal */}
       {followModal && (

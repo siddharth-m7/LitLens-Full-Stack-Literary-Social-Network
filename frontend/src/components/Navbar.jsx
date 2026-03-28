@@ -46,6 +46,15 @@ export default function Navbar() {
               Home
             </Link>
 
+            {user && (
+              <Link
+                to="/dashboard"
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+              >
+                Dashboard
+              </Link>
+            )}
+
             <Link
               to="/about"
               className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
@@ -61,20 +70,12 @@ export default function Navbar() {
             </Link>
 
             {user && (
-              <>
-                <Link
-                  to="/dashboard"
-                  className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/profile"
-                  className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-                >
-                  Profile
-                </Link>
-              </>
+              <Link
+                to="/profile"
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+              >
+                Profile
+              </Link>
             )}
           </div>
 
@@ -149,6 +150,16 @@ export default function Navbar() {
               Home
             </Link>
 
+            {user && (
+              <Link
+                to="/dashboard"
+                onClick={closeMobileMenu}
+                className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              >
+                Dashboard
+              </Link>
+            )}
+
             <Link
               to="/about"
               onClick={closeMobileMenu}
@@ -166,22 +177,13 @@ export default function Navbar() {
             </Link>
 
             {user && (
-              <>
-                <Link
-                  to="/dashboard"
-                  onClick={closeMobileMenu}
-                  className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  to="/profile"
-                  onClick={closeMobileMenu}
-                  className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-                >
-                  Profile
-                </Link>
-              </>
+              <Link
+                to="/profile"
+                onClick={closeMobileMenu}
+                className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+              >
+                Profile
+              </Link>
             )}
 
             {/* Mobile Authentication */}

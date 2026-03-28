@@ -108,6 +108,9 @@ export const removeFromReadingList = (bookId) =>
 export const fetchProfile = () =>
   axios.get(`${BASE}/users/me`, { headers: authHeaders() }).then(r => r.data);
 
+export const deleteAccount = () =>
+  axios.delete(`${BASE}/users/me`, { headers: authHeaders() }).then(r => r.data);
+
 export const fetchPublicProfile = (id) =>
   axios.get(`${BASE}/users/${id}`).then(r => r.data);
 
