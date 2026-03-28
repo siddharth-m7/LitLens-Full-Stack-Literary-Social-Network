@@ -1,25 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { useMutation } from '@tanstack/react-query';
+import { forgotPassword } from '../lib/api';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const mutation = useMutation({
+    mutationFn: forgotPassword,
+  });
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/auth/forgot-password`, { email });
-      setSubmitted(true);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    mutation.mutate(email);
   };
 
   return (
@@ -34,7 +27,7 @@ export default function ForgotPassword() {
 
         <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm p-8">
 
-          {submitted ? (
+          {mutation.isSuccess ? (
             <div className="text-center py-2">
               <div className="w-12 h-12 bg-[#F0EAD6] rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,12 +55,12 @@ export default function ForgotPassword() {
                 Enter your email and we'll send you a reset link.
               </p>
 
-              {error && (
+              {mutation.error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-5 flex items-start gap-2">
                   <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
-                  <p className="text-red-700 text-sm">{error}</p>
+                  <p className="text-red-700 text-sm">{mutation.error?.response?.data?.message || 'Something went wrong. Please try again.'}</p>
                 </div>
               )}
 
@@ -89,10 +82,10 @@ export default function ForgotPassword() {
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={mutation.isPending}
+                  className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none flex items-center justify-center gap-2"
                 >
-                  {loading ? (
+                  {mutation.isPending ? (
                     <>
                       <svg className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" viewBox="0 0 24 24"></svg>
                       Sending...

@@ -1,66 +1,88 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
+import { fetchAdminUsers, banUser, promoteUser } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
+
+function ConfirmModal({ isOpen, title, message, confirmLabel, confirmClass, onConfirm, onCancel }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-xl border border-[#E8E0CE] p-6 max-w-sm w-full">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+        <p className="text-gray-600 text-sm mb-6">{message}</p>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="border-2 border-gray-900 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`px-4 py-2 rounded-lg text-sm font-medium active:scale-[0.98] transition-all duration-150 ${confirmClass}`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function UserManagement() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [actionLoading, setActionLoading] = useState({});
+  const [modal, setModal] = useState(null); // { type: 'ban'|'promote', user }
+  const queryClient = useQueryClient();
 
-  const token = localStorage.getItem('token');
-  const headers = { Authorization: `Bearer ${token}` };
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: queryKeys.adminUsers(),
+    queryFn: fetchAdminUsers,
+  });
 
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/admin/users`, { headers });
-      setUsers(res.data);
-    } catch (err) {
-      console.error('Error fetching users:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchUsers(); }, []);
-
-  const setLoading1 = (id, key, val) =>
-    setActionLoading(prev => ({ ...prev, [`${id}_${key}`]: val }));
-
-  const handleBan = async (user) => {
-    const action = user.banned ? 'unban' : 'ban';
-    if (!window.confirm(`Are you sure you want to ${action} ${user.name}?`)) return;
-    setLoading1(user._id, 'ban', true);
-    try {
-      const res = await axios.patch(
-        `${import.meta.env.VITE_API_URL}/admin/users/${user._id}/ban`,
-        {},
-        { headers }
+  const banMutation = useMutation({
+    mutationFn: banUser,
+    onMutate: async (userId) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.adminUsers() });
+      const prev = queryClient.getQueryData(queryKeys.adminUsers());
+      queryClient.setQueryData(queryKeys.adminUsers(), old =>
+        old.map(u => u._id === userId ? { ...u, banned: !u.banned } : u)
       );
-      setUsers(prev => prev.map(u => u._id === user._id ? res.data : u));
-    } catch (err) {
-      console.error('Error toggling ban:', err);
-    } finally {
-      setLoading1(user._id, 'ban', false);
-    }
-  };
-
-  const handlePromote = async (user) => {
-    if (!window.confirm(`Promote ${user.name} to admin? This cannot be undone.`)) return;
-    setLoading1(user._id, 'promote', true);
-    try {
-      const res = await axios.patch(
-        `${import.meta.env.VITE_API_URL}/admin/users/${user._id}/promote`,
-        {},
-        { headers }
+      return { prev };
+    },
+    onError: (_, __, ctx) => {
+      queryClient.setQueryData(queryKeys.adminUsers(), ctx.prev);
+      toast.error('Failed to update ban status');
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.adminUsers(), old =>
+        old.map(u => u._id === data._id ? data : u)
       );
-      setUsers(prev => prev.map(u => u._id === user._id ? res.data : u));
-    } catch (err) {
-      console.error('Error promoting user:', err);
-    } finally {
-      setLoading1(user._id, 'promote', false);
-    }
+      toast.success(data.banned ? 'User banned' : 'User unbanned');
+    },
+  });
+
+  const promoteMutation = useMutation({
+    mutationFn: promoteUser,
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.adminUsers(), old =>
+        old.map(u => u._id === data._id ? data : u)
+      );
+      toast.success(`${data.name} promoted to admin`);
+    },
+    onError: () => toast.error('Failed to promote user'),
+  });
+
+  const handleBan = (user) => setModal({ type: 'ban', user });
+  const handlePromote = (user) => setModal({ type: 'promote', user });
+
+  const handleConfirm = () => {
+    if (!modal) return;
+    if (modal.type === 'ban') banMutation.mutate(modal.user._id);
+    if (modal.type === 'promote') promoteMutation.mutate(modal.user._id);
+    setModal(null);
   };
 
   const filtered = users.filter(u =>
@@ -84,7 +106,7 @@ export default function UserManagement() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
               <p className="text-gray-500 mt-1 text-sm">
-                {loading ? 'Loading...' : `${users.length} registered users`}
+                {isLoading ? 'Loading...' : `${users.length} registered users`}
               </p>
             </div>
             <input
@@ -98,10 +120,19 @@ export default function UserManagement() {
 
         {/* Table */}
         <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-900 border-t-transparent mb-4"></div>
-              <p className="text-gray-500 text-sm">Loading users...</p>
+          {isLoading ? (
+            <div className="divide-y divide-[#E8E0CE]">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="px-6 py-4 flex items-center gap-4 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-[#F0EAD6]" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 bg-[#E8E0CE] rounded w-32" />
+                    <div className="h-3 bg-[#E8E0CE] rounded w-48" />
+                  </div>
+                  <div className="h-6 bg-[#E8E0CE] rounded w-14" />
+                  <div className="h-6 bg-[#E8E0CE] rounded w-14" />
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-20">
@@ -160,22 +191,22 @@ export default function UserManagement() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleBan(user)}
-                            disabled={!!actionLoading[`${user._id}_ban`]}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 border ${
+                            disabled={banMutation.isPending}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 border ${
                               user.banned
-                                ? 'border-green-300 text-green-700 hover:bg-green-50'
-                                : 'border-red-300 text-red-600 hover:bg-red-50'
+                                ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
+                                : 'border-[#E8E0CE] bg-white text-gray-700 hover:bg-red-50 hover:text-red-600 hover:border-red-200'
                             }`}
                           >
-                            {actionLoading[`${user._id}_ban`] ? '...' : user.banned ? 'Unban' : 'Ban'}
+                            {user.banned ? 'Unban' : 'Ban'}
                           </button>
                           {user.role !== 'admin' && (
                             <button
                               onClick={() => handlePromote(user)}
-                              disabled={!!actionLoading[`${user._id}_promote`]}
-                              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F0EAD6] text-gray-700 hover:bg-amber-100 transition-colors disabled:opacity-50 border border-[#E8E0CE]"
+                              disabled={promoteMutation.isPending}
+                              className="border border-[#E8E0CE] bg-white text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#F0EAD6] hover:border-[#D5CAAC] active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
                             >
-                              {actionLoading[`${user._id}_promote`] ? '...' : 'Promote'}
+                              Promote
                             </button>
                           )}
                         </div>
@@ -188,6 +219,22 @@ export default function UserManagement() {
           )}
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={!!modal}
+        title={modal?.type === 'ban'
+          ? (modal.user?.banned ? `Unban ${modal.user?.name}?` : `Ban ${modal.user?.name}?`)
+          : `Promote ${modal?.user?.name}?`}
+        message={modal?.type === 'ban'
+          ? (modal.user?.banned ? "This will restore the user's access." : 'This user will lose access to the platform.')
+          : 'This will grant admin privileges. This cannot be undone.'}
+        confirmLabel={modal?.type === 'ban' ? (modal.user?.banned ? 'Unban' : 'Ban') : 'Promote'}
+        confirmClass={modal?.type === 'ban'
+          ? 'bg-red-600 text-white hover:bg-red-700'
+          : 'bg-gray-900 text-white hover:bg-gray-800'}
+        onConfirm={handleConfirm}
+        onCancel={() => setModal(null)}
+      />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import axios from 'axios'; // kept for Open Library external API only
 import Papa from 'papaparse';
+import { createBook } from '../lib/api';
 
 const GENRES = ['Fiction', 'Non-Fiction', 'Mystery', 'Science Fiction', 'Fantasy', 'Romance', 'Thriller', 'Biography', 'Self-Help', 'Historical Fiction', 'Horror', 'Poetry', 'Other'];
 
@@ -22,8 +23,6 @@ function downloadTemplate() {
 
 export default function BulkImport() {
   const [tab, setTab] = useState('csv');
-  const token = localStorage.getItem('token');
-  const headers = { Authorization: `Bearer ${token}` };
 
   // --- CSV state ---
   const [csvRows, setCsvRows] = useState([]);
@@ -99,7 +98,7 @@ export default function BulkImport() {
     const failed = [];
     for (let i = 0; i < csvRows.length; i++) {
       try {
-        await axios.post(`${import.meta.env.VITE_API_URL}/books`, csvRows[i], { headers });
+        await createBook(csvRows[i]);
         added++;
       } catch (err) {
         failed.push({ row: i + 1, title: csvRows[i].title, error: err.response?.data?.message || 'Unknown error' });
@@ -169,11 +168,7 @@ export default function BulkImport() {
     const failed = [];
     for (const row of toImport) {
       try {
-        await axios.post(
-          `${import.meta.env.VITE_API_URL}/books`,
-          { title: row.title, author: row.author, description: row.description, genre: row.genre, coverImage: row.coverImage },
-          { headers }
-        );
+        await createBook({ title: row.title, author: row.author, description: row.description, genre: row.genre, coverImage: row.coverImage });
         added++;
       } catch (err) {
         failed.push({ title: row.title || row.isbn, error: err.response?.data?.message || 'Unknown error' });
@@ -210,13 +205,13 @@ export default function BulkImport() {
         <div className="flex gap-1 mb-6 border-b border-[#E8E0CE]">
           <button
             onClick={() => setTab('csv')}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors ${tab === 'csv' ? 'border-b-2 border-gray-900 text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 pb-3 text-sm font-medium transition-all duration-150 border-b-2 ${tab === 'csv' ? 'font-semibold text-gray-900 border-gray-900' : 'text-gray-400 border-transparent hover:text-gray-700 hover:border-gray-300'}`}
           >
             CSV Upload
           </button>
           <button
             onClick={() => setTab('isbn')}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors ${tab === 'isbn' ? 'border-b-2 border-gray-900 text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`px-4 pb-3 text-sm font-medium transition-all duration-150 border-b-2 ${tab === 'isbn' ? 'font-semibold text-gray-900 border-gray-900' : 'text-gray-400 border-transparent hover:text-gray-700 hover:border-gray-300'}`}
           >
             ISBN Batch
           </button>
@@ -233,7 +228,7 @@ export default function BulkImport() {
               {/* Download template + file input */}
               <div className="flex flex-col sm:flex-row gap-3">
                 <button onClick={downloadTemplate}
-                  className="inline-flex items-center gap-2 border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium text-sm">
+                  className="inline-flex items-center gap-2 border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-[#F0EAD6] hover:border-[#D5CAAC] active:scale-[0.98] transition-all duration-150">
                   Download Template
                 </button>
                 <label className="flex-1 flex items-center gap-3 px-4 py-2.5 border border-dashed border-[#E8E0CE] rounded-lg cursor-pointer hover:border-gray-900 hover:bg-[#FAF6EE] transition-all">
@@ -323,7 +318,7 @@ export default function BulkImport() {
                   <button
                     onClick={handleCsvImport}
                     disabled={csvImporting || csvRows.length === 0}
-                    className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none"
                   >
                     {csvImporting ? `Importing... ${csvProgress}%` : `Import ${csvRows.length} Books`}
                   </button>
@@ -373,7 +368,7 @@ export default function BulkImport() {
               <button
                 onClick={handleIsbnLookup}
                 disabled={isbnLooking || !isbnText.trim()}
-                className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none flex items-center justify-center gap-2"
               >
                 {isbnLooking ? (
                   <>
@@ -461,7 +456,7 @@ export default function BulkImport() {
                     <button
                       onClick={handleIsbnImport}
                       disabled={isbnImporting}
-                      className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none"
                     >
                       {isbnImporting
                         ? 'Importing...'

@@ -1,7 +1,17 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import axios from 'axios';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  fetchBook,
+  fetchFavoriteStatus, toggleFavorite,
+  fetchReadingStatus, setReadingStatus, removeFromReadingList,
+  fetchLikeStatus, toggleLike,
+  fetchComments, addComment, deleteComment,
+  addReview, updateReview, deleteReview,
+} from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 const RL_LABELS = {
   want_to_read: 'Want to Read',
@@ -15,50 +25,55 @@ const TAGS = [
   'Beginner Friendly', 'Classic',
 ];
 
+const EMPTY_FORM = { rating: '', comment: '', tags: [], pros: [], cons: [], imageUrl: '', prosInput: '', consInput: '' };
+
 export default function BookDetails() {
   const { id } = useParams();
   const { user } = useAuth();
-  const [book, setBook] = useState(null);
-  const [form, setForm] = useState({ rating: '', comment: '', tags: [], pros: [], cons: [], imageUrl: '', prosInput: '', consInput: '' });
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState(EMPTY_FORM);
   const [editing, setEditing] = useState(null);
-
-  // Favorites & reading list
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [readingStatus, setReadingStatus] = useState(null);
-  const [favLoading, setFavLoading] = useState(false);
-  const [rlLoading, setRlLoading] = useState(false);
   const [showRlDropdown, setShowRlDropdown] = useState(false);
   const rlDropdownRef = useRef(null);
 
-  // Likes  { [reviewId]: { liked, likeCount } }
+  // Likes { [reviewId]: { liked, likeCount } } — local optimistic state
   const [likeData, setLikeData] = useState({});
   // Comments { [reviewId]: Comment[] }
   const [commentData, setCommentData] = useState({});
-  // Which comment sections are expanded
   const [expandedComments, setExpandedComments] = useState({});
-  // Comment input text per review
   const [commentInputs, setCommentInputs] = useState({});
   const [commentLoading, setCommentLoading] = useState({});
   const [reviewSort, setReviewSort] = useState('newest');
 
-  const fetchDetails = async () => {
-    try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/books/${id}`);
-      setBook(res.data);
-    } catch (err) {
-      console.error('Error fetching book:', err);
-    }
-  };
+  // ── Data queries ──────────────────────────────────────────────────────────
+  const { data: book, isLoading: bookLoading } = useQuery({
+    queryKey: queryKeys.book(id),
+    queryFn: () => fetchBook(id),
+    enabled: !!id,
+  });
+
+  const { data: favData } = useQuery({
+    queryKey: queryKeys.favoriteStatus(id),
+    queryFn: () => fetchFavoriteStatus(id),
+    enabled: !!user && !!id,
+  });
+
+  const { data: rlData } = useQuery({
+    queryKey: queryKeys.readingStatus(id),
+    queryFn: () => fetchReadingStatus(id),
+    enabled: !!user && !!id,
+  });
+
+  const isFavorited = favData?.favorited ?? false;
+  const readingStatus = rlData?.status ?? null;
 
   // After book loads, fetch like status for all reviews in parallel
   useEffect(() => {
     if (!book?.reviews?.length) return;
-    const token = localStorage.getItem('token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     Promise.all(
       book.reviews.map(r =>
-        axios.get(`${import.meta.env.VITE_API_URL}/reviews/${r._id}/like/status`, { headers })
-          .then(res => ({ id: r._id, ...res.data }))
+        fetchLikeStatus(r._id)
+          .then(data => ({ id: r._id, ...data }))
           .catch(() => ({ id: r._id, liked: false, likeCount: 0 }))
       )
     ).then(results => {
@@ -67,25 +82,6 @@ export default function BookDetails() {
       setLikeData(map);
     });
   }, [book]);
-
-  // Fetch fav + reading list status when user is logged in
-  useEffect(() => {
-    if (!user || !id) return;
-    const token = localStorage.getItem('token');
-    Promise.all([
-      axios.get(`${import.meta.env.VITE_API_URL}/favorites/${id}/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-      axios.get(`${import.meta.env.VITE_API_URL}/reading-list/${id}/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }),
-    ])
-      .then(([favRes, rlRes]) => {
-        setIsFavorited(favRes.data.favorited);
-        setReadingStatus(rlRes.data.status);
-      })
-      .catch(console.error);
-  }, [user, id]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -98,35 +94,80 @@ export default function BookDetails() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => { fetchDetails(); }, []);
+  // ── Mutations ─────────────────────────────────────────────────────────────
+  const addReviewMutation = useMutation({
+    mutationFn: addReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+      setForm(EMPTY_FORM);
+      toast.success('Review submitted!');
+    },
+    onError: () => toast.error('Failed to submit review'),
+  });
+
+  const updateReviewMutation = useMutation({
+    mutationFn: updateReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+      setEditing(null);
+      setForm(EMPTY_FORM);
+      toast.success('Review updated!');
+    },
+    onError: () => toast.error('Failed to update review'),
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: deleteReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+      toast.success('Review deleted');
+    },
+    onError: () => toast.error('Failed to delete review'),
+  });
+
+  const favMutation = useMutation({
+    mutationFn: () => toggleFavorite(id),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.favoriteStatus(id) });
+      const prev = queryClient.getQueryData(queryKeys.favoriteStatus(id));
+      queryClient.setQueryData(queryKeys.favoriteStatus(id), old => ({ favorited: !old?.favorited }));
+      return { prev };
+    },
+    onError: (_, __, ctx) => {
+      queryClient.setQueryData(queryKeys.favoriteStatus(id), ctx.prev);
+      toast.error('Failed to update favorites');
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.favoriteStatus(id), { favorited: data.favorited });
+      toast.success(data.favorited ? 'Added to favorites' : 'Removed from favorites');
+    },
+  });
+
+  const rlMutation = useMutation({
+    mutationFn: (status) => status === null
+      ? removeFromReadingList(id)
+      : setReadingStatus({ bookId: id, status }),
+    onMutate: async (status) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.readingStatus(id) });
+      const prev = queryClient.getQueryData(queryKeys.readingStatus(id));
+      queryClient.setQueryData(queryKeys.readingStatus(id), { status });
+      return { prev };
+    },
+    onError: (_, __, ctx) => queryClient.setQueryData(queryKeys.readingStatus(id), ctx.prev),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
+    },
+  });
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const payload = {
-      rating: form.rating,
-      comment: form.comment,
-      tags: form.tags,
-      pros: form.pros,
-      cons: form.cons,
-      imageUrl: form.imageUrl,
-    };
-    try {
-      if (editing) {
-        await axios.put(`${import.meta.env.VITE_API_URL}/reviews/${editing}`, payload, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-      } else {
-        await axios.post(`${import.meta.env.VITE_API_URL}/reviews/${id}`, payload, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-      }
-      setForm({ rating: '', comment: '', tags: [], pros: [], cons: [], imageUrl: '', prosInput: '', consInput: '' });
-      setEditing(null);
-      fetchDetails();
-    } catch (err) {
-      console.error('Error submitting review:', err);
+    const payload = { rating: form.rating, comment: form.comment, tags: form.tags, pros: form.pros, cons: form.cons, imageUrl: form.imageUrl };
+    if (editing) {
+      updateReviewMutation.mutate({ id: editing, ...payload });
+    } else {
+      addReviewMutation.mutate({ bookId: id, ...payload });
     }
   };
 
@@ -144,82 +185,45 @@ export default function BookDetails() {
     setEditing(review._id);
   };
 
-  const handleDeleteReview = async (reviewId) => {
-    try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/reviews/${reviewId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      fetchDetails();
-    } catch (err) {
-      console.error('Error deleting review:', err);
-    }
-  };
+  const handleDeleteReview = (reviewId) => deleteReviewMutation.mutate(reviewId);
 
-  const handleToggleFavorite = async () => {
+  const handleToggleFavorite = () => {
     if (!user) return;
-    setFavLoading(true);
-    try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/favorites/${id}`,
-        {},
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setIsFavorited(res.data.favorited);
-    } catch (err) {
-      console.error('Toggle favorite failed:', err);
-    } finally {
-      setFavLoading(false);
-    }
+    favMutation.mutate();
   };
 
-  const handleReadingListUpdate = async (status) => {
-    setRlLoading(true);
+  const handleReadingListUpdate = (status) => {
     setShowRlDropdown(false);
-    try {
-      if (status === null) {
-        await axios.delete(`${import.meta.env.VITE_API_URL}/reading-list/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        setReadingStatus(null);
-      } else {
-        await axios.post(
-          `${import.meta.env.VITE_API_URL}/reading-list/${id}`,
-          { status },
-          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-        );
-        setReadingStatus(status);
-      }
-    } catch (err) {
-      console.error('Reading list update failed:', err);
-    } finally {
-      setRlLoading(false);
-    }
+    rlMutation.mutate(status);
   };
 
   const handleToggleLike = async (reviewId) => {
     if (!user) return;
+    // Optimistic update
+    setLikeData(prev => {
+      const cur = prev[reviewId] || { liked: false, likeCount: 0 };
+      return { ...prev, [reviewId]: { liked: !cur.liked, likeCount: cur.liked ? cur.likeCount - 1 : cur.likeCount + 1 } };
+    });
     try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/reviews/${reviewId}/like`,
-        {},
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setLikeData(prev => ({ ...prev, [reviewId]: { liked: res.data.liked, likeCount: res.data.likeCount } }));
-    } catch (err) {
-      console.error('Like toggle failed:', err);
+      const res = await toggleLike(reviewId);
+      setLikeData(prev => ({ ...prev, [reviewId]: { liked: res.liked, likeCount: res.likeCount } }));
+    } catch {
+      // Revert on error
+      setLikeData(prev => {
+        const cur = prev[reviewId] || { liked: false, likeCount: 0 };
+        return { ...prev, [reviewId]: { liked: !cur.liked, likeCount: cur.liked ? cur.likeCount - 1 : cur.likeCount + 1 } };
+      });
     }
   };
 
   const handleToggleComments = async (reviewId) => {
     const nowExpanded = !expandedComments[reviewId];
     setExpandedComments(prev => ({ ...prev, [reviewId]: nowExpanded }));
-    // Lazy-load comments on first expand
     if (nowExpanded && !commentData[reviewId]) {
       try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/reviews/${reviewId}/comments`);
-        setCommentData(prev => ({ ...prev, [reviewId]: res.data }));
-      } catch (err) {
-        console.error('Failed to load comments:', err);
+        const data = await fetchComments(reviewId);
+        setCommentData(prev => ({ ...prev, [reviewId]: data }));
+      } catch {
         setCommentData(prev => ({ ...prev, [reviewId]: [] }));
       }
     }
@@ -230,15 +234,11 @@ export default function BookDetails() {
     if (!text) return;
     setCommentLoading(prev => ({ ...prev, [reviewId]: true }));
     try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/reviews/${reviewId}/comments`,
-        { text },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setCommentData(prev => ({ ...prev, [reviewId]: [...(prev[reviewId] || []), res.data] }));
+      const data = await addComment({ reviewId, text });
+      setCommentData(prev => ({ ...prev, [reviewId]: [...(prev[reviewId] || []), data] }));
       setCommentInputs(prev => ({ ...prev, [reviewId]: '' }));
-    } catch (err) {
-      console.error('Add comment failed:', err);
+    } catch {
+      toast.error('Failed to post comment');
     } finally {
       setCommentLoading(prev => ({ ...prev, [reviewId]: false }));
     }
@@ -246,15 +246,13 @@ export default function BookDetails() {
 
   const handleDeleteComment = async (reviewId, commentId) => {
     try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/comments/${commentId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
+      await deleteComment(commentId);
       setCommentData(prev => ({
         ...prev,
         [reviewId]: prev[reviewId].filter(c => c._id !== commentId),
       }));
-    } catch (err) {
-      console.error('Delete comment failed:', err);
+    } catch {
+      toast.error('Failed to delete comment');
     }
   };
 
@@ -283,17 +281,63 @@ export default function BookDetails() {
 
   const inputCls = 'w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors';
 
+  if (bookLoading) {
+    return (
+      <div className="min-h-screen bg-[#FAF6EE]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          {/* Book hero skeleton */}
+          <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden mb-6 animate-pulse">
+            <div className="p-6 sm:p-8">
+              <div className="flex items-start gap-6">
+                <div className="hidden sm:block w-24 h-36 bg-[#F0EAD6] rounded-lg flex-shrink-0" />
+                <div className="flex-1 space-y-3">
+                  <div className="h-8 bg-[#E8E0CE] rounded w-3/4" />
+                  <div className="h-4 bg-[#E8E0CE] rounded w-1/3" />
+                  <div className="h-6 bg-[#E8E0CE] rounded w-24" />
+                  <div className="h-4 bg-[#E8E0CE] rounded w-full mt-4" />
+                  <div className="h-4 bg-[#E8E0CE] rounded w-5/6" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="lg:grid lg:grid-cols-5 lg:gap-8">
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-white border border-[#E8E0CE] rounded-xl p-6 animate-pulse space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="h-10 bg-[#F0EAD6] rounded-lg" />
+                ))}
+              </div>
+            </div>
+            <div className="lg:col-span-3 mt-6 lg:mt-0">
+              <div className="bg-white border border-[#E8E0CE] rounded-xl p-6 animate-pulse space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="h-4 bg-[#E8E0CE] rounded w-20" />
+                    <div className="h-16 bg-[#F0EAD6] rounded-lg" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!book) {
     return (
       <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-900 border-t-transparent" />
+        <div className="text-center">
+          <div className="text-5xl mb-4">📚</div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Book not found</h2>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#FAF6EE]">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
         {/* Book Hero Card */}
         <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden mb-6">
@@ -338,19 +382,25 @@ export default function BookDetails() {
           </div>
         </div>
 
+        {/* Two-column layout: left = actions + review form, right = reviews */}
+        <div className="lg:grid lg:grid-cols-5 lg:gap-8 lg:items-start">
+
+        {/* LEFT COLUMN */}
+        <div className="lg:col-span-2 lg:sticky lg:top-6 space-y-6 mb-6 lg:mb-0">
+
         {/* Favorite & Reading List Actions */}
         {user && (
           <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm px-6 py-4 mb-6 flex flex-wrap items-center gap-3">
             <button
               onClick={handleToggleFavorite}
-              disabled={favLoading}
-              className={`flex items-center gap-2 border px-4 py-2.5 rounded-lg font-medium transition-colors ${
+              disabled={favMutation.isPending}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium active:scale-[0.98] transition-all duration-150 ${
                 isFavorited
-                  ? 'border-red-300 text-red-600 hover:bg-red-50'
-                  : 'border-gray-900 text-gray-900 hover:bg-gray-100'
+                  ? 'border-2 border-red-400 bg-red-50 text-red-600 hover:bg-red-100'
+                  : 'border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'
               }`}
             >
-              {favLoading ? (
+              {favMutation.isPending ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
               ) : (
                 <svg className="w-4 h-4" fill={isFavorited ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
@@ -363,10 +413,10 @@ export default function BookDetails() {
             <div className="relative" ref={rlDropdownRef}>
               <button
                 onClick={() => setShowRlDropdown(!showRlDropdown)}
-                disabled={rlLoading}
-                className="flex items-center gap-2 border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                disabled={rlMutation.isPending}
+                className="flex items-center gap-2 border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
               >
-                {rlLoading ? (
+                {rlMutation.isPending ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-900 border-t-transparent" />
                 ) : (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,10 +512,10 @@ export default function BookDetails() {
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium border transition-all duration-150 ${
                       form.tags.includes(tag)
                         ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-[#E8E0CE] hover:border-gray-400'
+                        : 'bg-white text-gray-600 border-[#E8E0CE] hover:bg-[#FAF6EE] hover:border-gray-400'
                     }`}
                   >
                     {tag}
@@ -491,7 +541,7 @@ export default function BookDetails() {
                 <button
                   type="button"
                   onClick={addPro}
-                  className="px-4 py-2.5 border border-gray-900 text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
+                  className="px-4 py-2.5 border-2 border-gray-900 text-gray-900 rounded-lg text-sm font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                 >
                   + Add
                 </button>
@@ -525,7 +575,7 @@ export default function BookDetails() {
                 <button
                   type="button"
                   onClick={addCon}
-                  className="px-4 py-2.5 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                  className="px-4 py-2.5 border border-red-200 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 hover:border-red-300 active:scale-[0.98] transition-all duration-150"
                 >
                   + Add
                 </button>
@@ -568,9 +618,10 @@ export default function BookDetails() {
             <div className="flex flex-col sm:flex-row gap-3 pt-1">
               <button
                 type="submit"
-                className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                disabled={addReviewMutation.isPending || updateReviewMutation.isPending}
+                className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editing ? 'Update Review' : 'Submit Review'}
+                {(addReviewMutation.isPending || updateReviewMutation.isPending) ? 'Saving...' : editing ? 'Update Review' : 'Submit Review'}
               </button>
               {editing && (
                 <button
@@ -579,7 +630,7 @@ export default function BookDetails() {
                     setEditing(null);
                     setForm({ rating: '', comment: '', tags: [], pros: [], cons: [], imageUrl: '', prosInput: '', consInput: '' });
                   }}
-                  className="sm:w-auto border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="sm:w-auto border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                 >
                   Cancel
                 </button>
@@ -587,6 +638,11 @@ export default function BookDetails() {
             </div>
           </form>
         </div>
+
+        </div> {/* end left column */}
+
+        {/* RIGHT COLUMN */}
+        <div className="lg:col-span-3">
 
         {/* Reviews Section */}
         <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
@@ -613,10 +669,10 @@ export default function BookDetails() {
                   <button
                     key={value}
                     onClick={() => setReviewSort(value)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
                       reviewSort === value
                         ? 'bg-gray-900 text-white'
-                        : 'bg-[#F0EAD6] text-gray-700 hover:bg-[#E8E0CE]'
+                        : 'bg-white text-gray-500 border border-[#E8E0CE] hover:bg-[#F0EAD6] hover:text-gray-900'
                     }`}
                   >
                     {label}
@@ -737,13 +793,13 @@ export default function BookDetails() {
                               <div className="flex gap-2 sm:flex-col">
                                 <button
                                   onClick={() => handleEdit(r)}
-                                  className="border border-gray-900 text-gray-900 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-100 transition-colors"
+                                  className="border-2 border-gray-900 text-gray-900 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   onClick={() => handleDeleteReview(r._id)}
-                                  className="border border-red-300 text-red-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-50 transition-colors"
+                                  className="border border-red-200 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-100 hover:border-red-300 active:scale-[0.98] transition-all duration-150"
                                 >
                                   Delete
                                 </button>
@@ -757,10 +813,10 @@ export default function BookDetails() {
                             <button
                               onClick={() => handleToggleLike(r._id)}
                               disabled={!user}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 ${
                                 like.liked
-                                  ? 'bg-[#F0EAD6] text-gray-900 border border-[#E8E0CE]'
-                                  : 'bg-white text-gray-500 border border-[#E8E0CE] hover:bg-[#F0EAD6]'
+                                  ? 'bg-[#F0EAD6] text-gray-900 border-[#D5CAAC]'
+                                  : 'bg-white text-gray-500 border-[#E8E0CE] hover:bg-[#F0EAD6] hover:text-gray-900 hover:border-[#D5CAAC]'
                               } ${!user ? 'cursor-default opacity-60' : ''}`}
                               title={user ? (like.liked ? 'Unlike' : 'Mark as helpful') : 'Login to like'}
                             >
@@ -773,7 +829,7 @@ export default function BookDetails() {
                             {/* Comments toggle */}
                             <button
                               onClick={() => handleToggleComments(r._id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-gray-500 border border-[#E8E0CE] hover:bg-[#F0EAD6] transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-gray-500 border-[#E8E0CE] hover:bg-[#F0EAD6] hover:text-gray-900 hover:border-[#D5CAAC] transition-all duration-150"
                             >
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -811,7 +867,7 @@ export default function BookDetails() {
                                     {user?.id === c.user._id && (
                                       <button
                                         onClick={() => handleDeleteComment(r._id, c._id)}
-                                        className="text-gray-300 hover:text-red-500 transition-colors p-1 flex-shrink-0"
+                                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-[0.95] transition-all duration-150 flex-shrink-0"
                                         title="Delete comment"
                                       >
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -841,7 +897,7 @@ export default function BookDetails() {
                                 <button
                                   onClick={() => handleAddComment(r._id)}
                                   disabled={!commentInput.trim() || isSubmittingComment}
-                                  className="px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                  className="px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none transition-all duration-150"
                                 >
                                   {isSubmittingComment ? (
                                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
@@ -863,6 +919,9 @@ export default function BookDetails() {
             })()}
           </div>
         </div>
+
+        </div> {/* end right column */}
+        </div> {/* end two-column grid */}
 
       </div>
     </div>

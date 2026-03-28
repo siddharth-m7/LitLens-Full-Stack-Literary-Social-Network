@@ -1,26 +1,38 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { useQuery } from '@tanstack/react-query';
+import { fetchLeaderboard } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function Leaderboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.leaderboard(),
+    queryFn: fetchLeaderboard,
+    staleTime: 1000 * 60,
+  });
 
-  useEffect(() => {
-    axios.get(`${import.meta.env.VITE_API_URL}/leaderboard`)
-      .then(res => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-900 border-t-transparent mx-auto mb-4" />
-          <p className="text-gray-500 text-sm">Loading leaderboard...</p>
+      <div className="min-h-screen bg-[#FAF6EE]">
+        <div className="max-w-3xl mx-auto px-4 py-10">
+          <div className="mb-8 text-center">
+            <div className="h-8 bg-[#E8E0CE] rounded-lg w-48 mx-auto mb-2 animate-pulse" />
+            <div className="h-4 bg-[#E8E0CE] rounded w-32 mx-auto animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-white border border-[#E8E0CE] rounded-xl p-4 animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-[#F0EAD6] rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-[#E8E0CE] rounded w-32" />
+                    <div className="h-3 bg-[#E8E0CE] rounded w-20" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -112,7 +124,7 @@ export default function Leaderboard() {
         <div className="mt-8 text-center">
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+            className="inline-flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 text-sm"
           >
             Browse Books &amp; Write Reviews
           </Link>

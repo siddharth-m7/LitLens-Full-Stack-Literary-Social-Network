@@ -29,7 +29,7 @@ export default function Home() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="bg-gray-900 text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
               >
                 Go to Dashboard
               </button>
@@ -38,13 +38,13 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-3">
               <Link
                 to="/login"
-                className="border border-gray-900 text-gray-900 px-6 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium text-center"
+                className="border-2 border-gray-900 text-gray-900 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150 text-center"
               >
                 Sign In
               </Link>
               <Link
                 to="/register"
-                className="bg-gray-900 text-white px-6 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium text-center"
+                className="bg-gray-900 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 text-center"
               >
                 Join Now
               </Link>

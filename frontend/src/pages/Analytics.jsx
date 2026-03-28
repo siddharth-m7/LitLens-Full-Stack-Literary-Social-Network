@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import { useQuery } from '@tanstack/react-query';
+import { fetchAnalytics } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -20,27 +21,39 @@ function KPICard({ label, value, icon }) {
   );
 }
 
+function KPICardSkeleton() {
+  return (
+    <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm p-6 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-3 bg-[#E8E0CE] rounded w-20" />
+          <div className="h-8 bg-[#E8E0CE] rounded w-16 mt-1" />
+        </div>
+        <div className="w-10 h-10 bg-[#E8E0CE] rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+function ChartSkeleton({ height = 240 }) {
+  return (
+    <div className="animate-pulse" style={{ height }}>
+      <div className="h-full bg-[#F0EAD6] rounded-lg" />
+    </div>
+  );
+}
+
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 export default function Analytics() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const token = localStorage.getItem('token');
-
-  useEffect(() => {
-    axios
-      .get(`${import.meta.env.VITE_API_URL}/admin/analytics`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then(res => setData(res.data))
-      .catch(() => setError('Failed to load analytics. Please try again.'))
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: queryKeys.analytics(),
+    queryFn: fetchAnalytics,
+    staleTime: 1000 * 60 * 5,
+  });
 
   return (
     <div className="min-h-screen bg-[#FAF6EE]">
@@ -58,14 +71,27 @@ export default function Analytics() {
           <p className="text-gray-500 mt-1 text-sm">Platform statistics and insights</p>
         </div>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-900 border-t-transparent mb-4"></div>
-            <p className="text-gray-500 text-sm">Loading analytics...</p>
-          </div>
-        ) : error ? (
+        {isLoading ? (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {[...Array(4)].map((_, i) => <KPICardSkeleton key={i} />)}
+            </div>
+            <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm p-6 mb-6">
+              <div className="h-5 bg-[#E8E0CE] rounded w-48 mb-4 animate-pulse" />
+              <ChartSkeleton height={240} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm p-6">
+                  <div className="h-5 bg-[#E8E0CE] rounded w-40 mb-4 animate-pulse" />
+                  <ChartSkeleton height={220} />
+                </div>
+              ))}
+            </div>
+          </>
+        ) : isError ? (
           <div className="bg-white border border-red-200 rounded-xl p-8 text-center">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600">Failed to load analytics. Please try again.</p>
           </div>
         ) : (
           <>

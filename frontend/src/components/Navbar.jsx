@@ -1,12 +1,19 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import { fetchProfile } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [profileUser, setProfileUser] = useState({});
+
+  const { data: profileUser = {} } = useQuery({
+    queryKey: queryKeys.profile(),
+    queryFn: fetchProfile,
+    enabled: !!user,
+  });
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -15,23 +22,6 @@ export default function Navbar() {
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/users/me`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        setProfileUser(res.data);
-      } catch (err) {
-        console.error('Failed to load user profile:', err);
-      }
-    };
-
-    fetchProfile();
-  }, [user]);
 
   return (
     <nav className="bg-white border-b border-[#E8E0CE] sticky top-0 z-50">
@@ -71,12 +61,20 @@ export default function Navbar() {
             </Link>
 
             {user && (
-              <Link
-                to="/profile"
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-              >
-                Profile
-              </Link>
+              <>
+                <Link
+                  to="/dashboard"
+                  className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/profile"
+                  className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
+                >
+                  Profile
+                </Link>
+              </>
             )}
           </div>
 
@@ -86,13 +84,13 @@ export default function Navbar() {
               <>
                 <Link
                   to="/login"
-                  className="border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium text-sm"
+                  className="border-2 border-gray-900 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                 >
                   Login
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+                  className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm hover:shadow-md hover:bg-gray-800 active:scale-[0.98] transition-all duration-150"
                 >
                   Register
                 </Link>
@@ -110,7 +108,7 @@ export default function Navbar() {
 
                 <button
                   onClick={logout}
-                  className="text-gray-500 hover:text-gray-900 text-sm font-medium transition-colors"
+                  className="text-gray-500 text-sm font-medium hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 active:scale-[0.98] transition-all duration-150"
                 >
                   Logout
                 </button>
@@ -168,13 +166,22 @@ export default function Navbar() {
             </Link>
 
             {user && (
-              <Link
-                to="/profile"
-                onClick={closeMobileMenu}
-                className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                Profile
-              </Link>
+              <>
+                <Link
+                  to="/dashboard"
+                  onClick={closeMobileMenu}
+                  className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/profile"
+                  onClick={closeMobileMenu}
+                  className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                >
+                  Profile
+                </Link>
+              </>
             )}
 
             {/* Mobile Authentication */}
@@ -184,14 +191,14 @@ export default function Navbar() {
                   <Link
                     to="/login"
                     onClick={closeMobileMenu}
-                    className="block border border-gray-900 text-gray-900 py-2.5 px-4 rounded-lg hover:bg-gray-100 transition-colors font-medium text-sm text-center"
+                    className="block border-2 border-gray-900 text-gray-900 py-2.5 px-4 rounded-lg font-medium text-sm text-center hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                   >
                     Login
                   </Link>
                   <Link
                     to="/register"
                     onClick={closeMobileMenu}
-                    className="block bg-gray-900 text-white py-2.5 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm text-center"
+                    className="block bg-gray-900 text-white py-2.5 px-4 rounded-lg font-medium text-sm text-center shadow-sm hover:shadow-md hover:bg-gray-800 active:scale-[0.98] transition-all duration-150"
                   >
                     Register
                   </Link>
@@ -212,7 +219,7 @@ export default function Navbar() {
                       logout();
                       closeMobileMenu();
                     }}
-                    className="w-full text-left text-gray-500 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                    className="w-full text-left text-gray-500 text-sm font-medium hover:text-gray-900 py-2.5 px-4 rounded-lg hover:bg-gray-100 active:scale-[0.98] transition-all duration-150"
                   >
                     Logout
                   </button>

@@ -1,39 +1,27 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { useMutation } from '@tanstack/react-query';
+import { registerUser } from '../lib/api';
 
 export default function Register() {
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
-  const [success, setSuccess] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const registerMutation = useMutation({
+    mutationFn: registerUser,
+    onSuccess: () => {
+      setTimeout(() => navigate('/login'), 2000);
+    },
+  });
 
-    try {
-      await axios.post(`${import.meta.env.VITE_API_URL}/auth/register`, form);
-      setSuccess(true);
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    registerMutation.mutate(form);
   };
 
   return (
@@ -73,7 +61,7 @@ export default function Register() {
           <h2 className="text-2xl font-bold text-gray-900 mb-1">Create an account</h2>
           <p className="text-gray-500 text-sm mb-8">Start your reading journey today</p>
 
-          {success && (
+          {registerMutation.isSuccess && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6 flex items-start gap-2">
               <svg className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -82,12 +70,12 @@ export default function Register() {
             </div>
           )}
 
-          {error && (
+          {registerMutation.error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6 flex items-start gap-2">
               <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <p className="text-red-700 text-sm">{error}</p>
+              <p className="text-red-700 text-sm">{registerMutation.error?.response?.data?.message || 'Registration failed'}</p>
             </div>
           )}
 
@@ -166,15 +154,15 @@ export default function Register() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading || success}
-              className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={registerMutation.isPending || registerMutation.isSuccess}
+              className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none flex items-center justify-center gap-2"
             >
-              {loading ? (
+              {registerMutation.isPending ? (
                 <>
                   <svg className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" viewBox="0 0 24 24"></svg>
                   Creating Account...
                 </>
-              ) : success ? (
+              ) : registerMutation.isSuccess ? (
                 <>
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />

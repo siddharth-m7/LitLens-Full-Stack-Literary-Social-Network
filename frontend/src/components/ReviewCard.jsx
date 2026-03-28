@@ -75,7 +75,7 @@ export default function ReviewCard({ review, onEdit, onDelete }) {
           <div className="flex items-center space-x-2 sm:space-x-2">
             <button
               onClick={() => onEdit(review)}
-              className="flex items-center space-x-1 border border-gray-900 text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium focus:outline-none"
+              className="flex items-center space-x-1 border-2 border-gray-900 text-gray-900 px-3 py-2 rounded-lg font-medium text-sm hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150 focus:outline-none"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -86,10 +86,10 @@ export default function ReviewCard({ review, onEdit, onDelete }) {
             <button
               onClick={handleDelete}
               disabled={isDeleting}
-              className={`flex items-center space-x-1 border border-red-300 text-red-600 px-3 py-2 rounded-lg transition-colors text-sm font-medium focus:outline-none ${
+              className={`flex items-center space-x-1 border border-red-200 bg-red-50 text-red-600 px-3 py-2 rounded-lg font-medium text-sm hover:bg-red-100 hover:border-red-300 active:scale-[0.98] transition-all duration-150 focus:outline-none ${
                 isDeleting
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'hover:bg-red-50'
+                  ? 'opacity-40 cursor-not-allowed active:scale-100'
+                  : ''
               }`}
             >
               {isDeleting ? (

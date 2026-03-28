@@ -1,19 +1,13 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import axios from 'axios';
+import { useEffect, useState, useRef } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { fetchBooks } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 const GENRES = ['Fiction', 'Non-Fiction', 'Mystery', 'Science Fiction', 'Fantasy', 'Romance', 'Thriller', 'Biography', 'Self-Help', 'Historical Fiction', 'Horror', 'Poetry', 'Other'];
 const LIMIT = 12;
 
 export default function UserDashboard() {
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [totalCount, setTotalCount] = useState(0);
-
   // Filter state
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -29,46 +23,24 @@ export default function UserDashboard() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Core fetch function
-  const fetchBooks = useCallback(async (pageNum, append) => {
-    if (append) setLoadingMore(true);
-    else setLoading(true);
-    setError('');
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: queryKeys.books({ search: debouncedSearch, genre, minRating, sort }),
+    queryFn: ({ pageParam = 1 }) =>
+      fetchBooks({ page: pageParam, limit: LIMIT, search: debouncedSearch, genre, minRating, sort }),
+    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.page + 1 : undefined,
+    initialPageParam: 1,
+  });
 
-    try {
-      const params = new URLSearchParams();
-      if (debouncedSearch) params.set('search', debouncedSearch);
-      if (genre !== 'All') params.set('genre', genre);
-      if (minRating) params.set('minRating', minRating);
-      if (sort) params.set('sort', sort);
-      params.set('page', pageNum);
-      params.set('limit', LIMIT);
-
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/books?${params.toString()}`);
-      const { data, hasNextPage: nextPage, totalCount: count } = res.data;
-
-      if (append) {
-        setBooks(prev => [...prev, ...data]);
-      } else {
-        setBooks(data);
-        setTotalCount(count);
-      }
-      setHasNextPage(nextPage);
-      setPage(pageNum);
-    } catch {
-      setError('Failed to load books. Please try again later.');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [debouncedSearch, genre, minRating, sort]);
-
-  // Reset and fetch on filter change
-  useEffect(() => {
-    setPage(1);
-    setHasNextPage(false);
-    fetchBooks(1, false);
-  }, [fetchBooks]);
+  const books = data?.pages.flatMap(p => p.data) ?? [];
+  const totalCount = data?.pages[0]?.totalCount ?? 0;
 
   // IntersectionObserver for infinite scroll
   useEffect(() => {
@@ -77,15 +49,15 @@ export default function UserDashboard() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !loadingMore && !loading) {
-          fetchBooks(page + 1, true);
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && !isLoading) {
+          fetchNextPage();
         }
       },
       { threshold: 0.1 }
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [hasNextPage, loadingMore, loading, page, fetchBooks]);
+  }, [hasNextPage, isFetchingNextPage, isLoading, fetchNextPage]);
 
   const clearFilters = () => {
     setSearch('');
@@ -151,7 +123,7 @@ export default function UserDashboard() {
         <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm p-5 mb-6">
           <div className="flex items-center gap-8">
             <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">{loading ? '—' : totalCount}</div>
+              <div className="text-3xl font-bold text-gray-900">{isLoading ? '—' : totalCount}</div>
               <div className="text-sm text-gray-500 mt-0.5">Books Available</div>
             </div>
             <div className="w-px h-10 bg-[#E8E0CE]" />
@@ -246,7 +218,7 @@ export default function UserDashboard() {
               {activeFilterCount > 0 && (
                 <button
                   onClick={clearFilters}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-100 transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-100 hover:border-gray-400 active:scale-[0.98] transition-all duration-150 whitespace-nowrap"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -259,16 +231,25 @@ export default function UserDashboard() {
         </div>
 
         {/* Books Grid */}
-        {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-900 border-t-transparent" />
+        {isLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="bg-white border border-[#E8E0CE] rounded-xl overflow-hidden animate-pulse">
+                <div className="w-full h-48 bg-[#F0EAD6]" />
+                <div className="p-3 space-y-2">
+                  <div className="h-3.5 bg-[#E8E0CE] rounded w-3/4" />
+                  <div className="h-3 bg-[#E8E0CE] rounded w-1/2" />
+                  <div className="h-3 bg-[#E8E0CE] rounded w-1/3" />
+                </div>
+              </div>
+            ))}
           </div>
-        ) : error ? (
+        ) : isError ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <p className="text-gray-900 font-medium">{error}</p>
+            <p className="text-gray-900 font-medium">Failed to load books. Please try again later.</p>
             <button
-              onClick={() => fetchBooks(1, false)}
-              className="bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+              onClick={() => refetch()}
+              className="bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
             >
               Try Again
             </button>
@@ -284,7 +265,7 @@ export default function UserDashboard() {
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                className="bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
               >
                 Clear Filters
               </button>
@@ -363,13 +344,13 @@ export default function UserDashboard() {
 
             {/* Infinite scroll sentinel */}
             <div ref={sentinelRef} className="py-8 flex justify-center">
-              {loadingMore && (
+              {isFetchingNextPage && (
                 <div className="flex items-center gap-2.5 text-gray-500">
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-900 border-t-transparent" />
                   <span className="text-sm">Loading more books...</span>
                 </div>
               )}
-              {!hasNextPage && books.length > 0 && !loadingMore && (
+              {!hasNextPage && books.length > 0 && !isFetchingNextPage && (
                 <p className="text-gray-400 text-sm">
                   Showing all {totalCount} {totalCount === 1 ? 'book' : 'books'}
                 </p>

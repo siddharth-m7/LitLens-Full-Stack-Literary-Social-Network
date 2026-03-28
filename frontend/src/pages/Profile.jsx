@@ -1,7 +1,16 @@
-import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
+import {
+  fetchProfile,
+  fetchFavorites,
+  fetchReadingList,
+  updateReview,
+  deleteReview,
+} from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 const RL_LABELS = {
   want_to_read: 'Want to Read',
@@ -15,78 +24,66 @@ const RL_COLORS = {
   finished: 'bg-green-100 text-green-800',
 };
 
+async function fetchFullProfile() {
+  const [profileData, favorites, readingList] = await Promise.all([
+    fetchProfile(),
+    fetchFavorites(),
+    fetchReadingList(),
+  ]);
+  return { ...profileData, favorites, readingList };
+}
+
 export default function Profile() {
   const { user } = useAuth();
-  const [reviews, setReviews] = useState([]);
-  const [favorites, setFavorites] = useState([]);
-  const [readingList, setReadingList] = useState([]);
-  const [badges, setBadges] = useState([]);
-  const [milestones, setMilestones] = useState([]);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [form, setForm] = useState({ rating: '', comment: '' });
-  const [editingReviewId, setEditingReviewId] = useState(null);
-  const [profileUser, setProfileUser] = useState({});
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const fetchReviews = async () => {
-    try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/reviews/my`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
+  const [form, setForm] = useState({ rating: '', comment: '' });
+  const [editingReviewId, setEditingReviewId] = useState(null);
 
-      setReviews(res.data.reviews);
-    } catch (err) {
-      console.error('Failed to fetch reviews:', err);
-    }
-  };
+  const { data: profileData } = useQuery({
+    queryKey: queryKeys.profile(),
+    queryFn: user?.role === 'user' ? fetchFullProfile : fetchProfile,
+    enabled: !!user,
+  });
 
-useEffect(() => {
-  const fetchProfile = async () => {
-    try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      setProfileUser(res.data);
-      if (res.data.badges) setBadges(res.data.badges);
-      if (res.data.milestones) setMilestones(res.data.milestones);
-      if (res.data.followerCount !== undefined) setFollowerCount(res.data.followerCount);
-      if (res.data.followingCount !== undefined) setFollowingCount(res.data.followingCount);
-    } catch (err) {
-      console.error('Failed to load user profile:', err);
-    }
-  };
+  const {
+    name: profileUserName,
+    email: profileUserEmail,
+    role: profileUserRole,
+    badges = [],
+    milestones = [],
+    followerCount = 0,
+    followingCount = 0,
+    reviews = [],
+    favorites = [],
+    readingList = [],
+  } = profileData ?? {};
 
-  fetchProfile();
+  const profileUser = profileData
+    ? { name: profileUserName, email: profileUserEmail, role: profileUserRole }
+    : {};
 
-  if (user?.role === 'user') {
-    fetchReviews();
-    const token = localStorage.getItem('token');
-    axios.get(`${import.meta.env.VITE_API_URL}/favorites`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(res => setFavorites(res.data)).catch(console.error);
-    axios.get(`${import.meta.env.VITE_API_URL}/reading-list`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(res => setReadingList(res.data)).catch(console.error);
-  }
-}, [user]);
+  const updateReviewMutation = useMutation({
+    mutationFn: updateReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
+      toast.success('Review updated');
+    },
+    onError: () => toast.error('Failed to update review'),
+  });
 
+  const deleteReviewMutation = useMutation({
+    mutationFn: deleteReview,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
+      toast.success('Review deleted');
+    },
+    onError: () => toast.error('Failed to delete review'),
+  });
 
-  const handleDelete = async (id) => {
-    try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/reviews/${id}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      fetchReviews();
-    } catch (err) {
-      console.error('Delete failed:', err);
-    }
+  const handleDelete = (id) => {
+    deleteReviewMutation.mutate(id);
   };
 
   const handleEdit = (review) => {
@@ -94,24 +91,17 @@ useEffect(() => {
     setForm({ rating: review.rating, comment: review.comment });
   };
 
-  const handleUpdate = async (e) => {
+  const handleUpdate = (e) => {
     e.preventDefault();
-    try {
-      await axios.put(
-        `${import.meta.env.VITE_API_URL}/reviews/${editingReviewId}`,
-        form,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-      setEditingReviewId(null);
-      setForm({ rating: '', comment: '' });
-      fetchReviews();
-    } catch (err) {
-      console.error('Update failed:', err);
-    }
+    updateReviewMutation.mutate(
+      { id: editingReviewId, ...form },
+      {
+        onSuccess: () => {
+          setEditingReviewId(null);
+          setForm({ rating: '', comment: '' });
+        },
+      }
+    );
   };
 
   return (
@@ -172,7 +162,7 @@ useEffect(() => {
                 </p>
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                  className="bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
                 >
                   Go to Admin Dashboard
                 </button>
@@ -305,9 +295,10 @@ useEffect(() => {
                             <div className="flex flex-col sm:flex-row gap-3">
                               <button
                                 type="submit"
-                                className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                                disabled={updateReviewMutation.isPending}
+                                className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                Update Review
+                                {updateReviewMutation.isPending ? 'Saving...' : 'Update Review'}
                               </button>
                               <button
                                 type="button"
@@ -315,7 +306,7 @@ useEffect(() => {
                                   setEditingReviewId(null);
                                   setForm({ rating: '', comment: '' });
                                 }}
-                                className="border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                                className="border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                               >
                                 Cancel
                               </button>
@@ -403,13 +394,14 @@ useEffect(() => {
                             <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2">
                               <button
                                 onClick={() => handleEdit(review)}
-                                className="flex-1 sm:flex-none border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium text-sm text-center"
+                                className="flex-1 sm:flex-none border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium text-sm text-center hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDelete(review._id)}
-                                className="flex-1 sm:flex-none border border-red-300 text-red-600 px-3 py-2 rounded-lg hover:bg-red-50 transition-colors text-sm text-center"
+                                disabled={deleteReviewMutation.isPending}
+                                className="flex-1 sm:flex-none border border-red-200 bg-red-50 text-red-600 px-3 py-2 rounded-lg font-medium text-sm text-center hover:bg-red-100 hover:border-red-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
                               >
                                 Delete
                               </button>
@@ -432,11 +424,11 @@ useEffect(() => {
                 <p className="text-gray-500 text-sm mt-0.5">Books you've marked as favorites</p>
               </div>
               <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                {favorites.length}
+                {favorites.filter(({ book }) => book != null).length}
               </span>
             </div>
             <div className="p-6 sm:p-8">
-              {favorites.length === 0 ? (
+              {favorites.filter(({ book }) => book != null).length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-3">🤍</div>
                   <p className="text-gray-500 font-medium text-sm">No favorites yet</p>
@@ -444,7 +436,7 @@ useEffect(() => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {favorites.map(({ _id, book }) => (
+                  {favorites.filter(({ book }) => book != null).map(({ _id, book }) => (
                     <Link
                       key={_id}
                       to={`/books/${book._id}`}
@@ -477,11 +469,11 @@ useEffect(() => {
                 <p className="text-gray-500 text-sm mt-0.5">Track your reading progress</p>
               </div>
               <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                {readingList.length}
+                {readingList.filter(({ book }) => book != null).length}
               </span>
             </div>
             <div className="p-6 sm:p-8">
-              {readingList.length === 0 ? (
+              {readingList.filter(({ book }) => book != null).length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-4xl mb-3">📚</div>
                   <p className="text-gray-500 font-medium text-sm">Your reading list is empty</p>
@@ -498,7 +490,7 @@ useEffect(() => {
                           {RL_LABELS[status]} ({items.length})
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {items.map(({ _id, book }) => (
+                          {items.filter(({ book }) => book != null).map(({ _id, book }) => (
                             <Link
                               key={_id}
                               to={`/books/${book._id}`}

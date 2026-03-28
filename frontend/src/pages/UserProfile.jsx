@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
+import { fetchPublicProfile, toggleFollow, fetchFollowStatus } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 const RL_LABELS = { want_to_read: 'Want to Read', reading: 'Currently Reading', finished: 'Finished' };
 const RL_COLORS = {
@@ -11,69 +12,41 @@ const RL_COLORS = {
 };
 
 export default function UserProfile() {
-  const { id } = useParams();
+  const { id: userId } = useParams();
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  const [profile, setProfile] = useState(null);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followLoading, setFollowLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const isOwnProfile = currentUser?.id === userId;
 
-  const isOwnProfile = currentUser?.id === id;
+  const { data: profileData, isLoading } = useQuery({
+    queryKey: queryKeys.publicProfile(userId),
+    queryFn: () => fetchPublicProfile(userId),
+    enabled: !!userId,
+  });
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/users/${id}`);
-        setProfile(res.data);
-        setFollowerCount(res.data.followerCount);
-        setFollowingCount(res.data.followingCount);
-      } catch (err) {
-        console.error('Failed to load profile:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: followData } = useQuery({
+    queryKey: queryKeys.followStatus(userId),
+    queryFn: () => fetchFollowStatus(userId),
+    enabled: !!currentUser && !isOwnProfile && !!userId,
+  });
 
-    const fetchFollowStatus = async () => {
-      if (!currentUser || isOwnProfile) return;
-      try {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL}/follow/${id}/status`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        setIsFollowing(res.data.following);
-      } catch (err) {
-        console.error('Failed to load follow status:', err);
-      }
-    };
+  const isFollowing = followData?.following ?? false;
 
-    fetchProfile();
-    fetchFollowStatus();
-  }, [id, currentUser, isOwnProfile]);
+  const followMutation = useMutation({
+    mutationFn: () => toggleFollow(userId),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.followStatus(userId), { following: data.following });
+      queryClient.invalidateQueries({ queryKey: queryKeys.publicProfile(userId) });
+    },
+  });
 
-  const handleToggleFollow = async () => {
+  const handleToggleFollow = () => {
     if (!currentUser) { navigate('/login'); return; }
-    setFollowLoading(true);
-    try {
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/follow/${id}`,
-        {},
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setIsFollowing(res.data.following);
-      setFollowerCount(c => res.data.following ? c + 1 : c - 1);
-    } catch (err) {
-      console.error('Follow toggle failed:', err);
-    } finally {
-      setFollowLoading(false);
-    }
+    followMutation.mutate();
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center">
         <div className="text-center">
@@ -84,7 +57,7 @@ export default function UserProfile() {
     );
   }
 
-  if (!profile) {
+  if (!profileData) {
     return (
       <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center">
         <div className="text-center">
@@ -96,8 +69,7 @@ export default function UserProfile() {
     );
   }
 
-  const { user, reviews, favorites, readingList, badges = [] } = profile;
-  const rlCounts = readingList.reduce((acc, e) => { acc[e.status] = (acc[e.status] || 0) + 1; return acc; }, {});
+  const { user, reviews, favorites, readingList, badges = [], followerCount, followingCount } = profileData;
 
   return (
     <div className="min-h-screen bg-[#FAF6EE]">
@@ -159,14 +131,14 @@ export default function UserProfile() {
               {currentUser && !isOwnProfile && (
                 <button
                   onClick={handleToggleFollow}
-                  disabled={followLoading}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors text-sm ${
+                  disabled={followMutation.isPending}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm active:scale-[0.98] transition-all duration-150 ${
                     isFollowing
-                      ? 'border border-gray-900 text-gray-900 hover:bg-gray-100'
-                      : 'bg-gray-900 text-white hover:bg-gray-800'
+                      ? 'border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'
+                      : 'bg-gray-900 text-white shadow-sm hover:bg-gray-800 hover:shadow-md'
                   }`}
                 >
-                  {followLoading ? (
+                  {followMutation.isPending ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
                   ) : isFollowing ? 'Following' : '+ Follow'}
                 </button>
@@ -174,7 +146,7 @@ export default function UserProfile() {
               {isOwnProfile && (
                 <Link
                   to="/profile"
-                  className="border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium text-sm"
+                  className="border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                 >
                   Edit Profile
                 </Link>

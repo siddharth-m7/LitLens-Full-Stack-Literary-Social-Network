@@ -1,40 +1,53 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import BookCard from '../components/BookCard';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import BookCard from '../components/BookCard';
+import { fetchBooks, createBook, updateBook, deleteBook } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
 
 const GENRES = ['Fiction', 'Non-Fiction', 'Mystery', 'Science Fiction', 'Fantasy', 'Romance', 'Thriller', 'Biography', 'Self-Help', 'Historical Fiction', 'Horror', 'Poetry', 'Other'];
 
 export default function AdminDashboard() {
-  const [books, setBooks] = useState([]);
+  const queryClient = useQueryClient();
+
   const [form, setForm] = useState({ title: '', author: '', description: '', genre: '', coverImage: '', isbn: '' });
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [isbnLoading, setIsbnLoading] = useState(false);
   const [isbnError, setIsbnError] = useState('');
 
   // Edit book state
   const [editingBook, setEditingBook] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', author: '', description: '', genre: '', coverImage: '', isbn: '' });
-  const [editSubmitting, setEditSubmitting] = useState(false);
   const [editIsbnLoading, setEditIsbnLoading] = useState(false);
   const [editIsbnError, setEditIsbnError] = useState('');
 
-  const fetchBooks = async () => {
-    try {
-      setLoading(true);
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/books`);
-      setBooks(res.data);
-    } catch (error) {
-      console.error('Error fetching books:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: booksData, isLoading } = useQuery({
+    queryKey: queryKeys.books({ limit: 1000 }),
+    queryFn: () => fetchBooks({ limit: 1000 }),
+  });
+  const books = booksData?.data ?? [];
 
-  useEffect(() => {
-    fetchBooks();
-  }, []);
+  const addMutation = useMutation({
+    mutationFn: createBook,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['books'] });
+      setForm({ title: '', author: '', description: '', genre: '', coverImage: '', isbn: '' });
+      setIsbnError('');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteBook,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['books'] }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateBook,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['books'] });
+      closeEditModal();
+    },
+  });
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -66,33 +79,12 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleAddBook = async (e) => {
+  const handleAddBook = (e) => {
     e.preventDefault();
-    try {
-      setSubmitting(true);
-      await axios.post(`${import.meta.env.VITE_API_URL}/books`, form, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      setForm({ title: '', author: '', description: '', genre: '', coverImage: '', isbn: '' });
-      setIsbnError('');
-      fetchBooks();
-    } catch (error) {
-      console.error('Error adding book:', error);
-    } finally {
-      setSubmitting(false);
-    }
+    addMutation.mutate(form);
   };
 
-  const handleDelete = async (id) => {
-    try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/books/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      fetchBooks();
-    } catch (error) {
-      console.error('Error deleting book:', error);
-    }
-  };
+  const handleDelete = (id) => deleteMutation.mutate(id);
 
   const openEditModal = (book) => {
     setEditingBook(book);
@@ -142,22 +134,16 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateBook = async (e) => {
+  const handleUpdateBook = (e) => {
     e.preventDefault();
-    try {
-      setEditSubmitting(true);
-      await axios.put(
-        `${import.meta.env.VITE_API_URL}/books/${editingBook._id}`,
-        { title: editForm.title, author: editForm.author, description: editForm.description, genre: editForm.genre, coverImage: editForm.coverImage },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      closeEditModal();
-      fetchBooks();
-    } catch (error) {
-      console.error('Error updating book:', error);
-    } finally {
-      setEditSubmitting(false);
-    }
+    updateMutation.mutate({
+      id: editingBook._id,
+      title: editForm.title,
+      author: editForm.author,
+      description: editForm.description,
+      genre: editForm.genre,
+      coverImage: editForm.coverImage,
+    });
   };
 
   const inputCls = 'w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors';
@@ -176,19 +162,19 @@ export default function AdminDashboard() {
         <div className="flex flex-wrap gap-2 mb-8">
           <Link
             to="/admin/users"
-            className="border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-[#F0EAD6] text-sm font-medium transition-colors"
+            className="border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-[#F0EAD6] hover:border-[#D5CAAC] active:scale-[0.98] text-sm font-medium transition-all duration-150"
           >
             User Management
           </Link>
           <Link
             to="/admin/analytics"
-            className="border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-[#F0EAD6] text-sm font-medium transition-colors"
+            className="border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-[#F0EAD6] hover:border-[#D5CAAC] active:scale-[0.98] text-sm font-medium transition-all duration-150"
           >
             Analytics
           </Link>
           <Link
             to="/admin/bulk-import"
-            className="border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-[#F0EAD6] text-sm font-medium transition-colors"
+            className="border border-[#E8E0CE] bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-[#F0EAD6] hover:border-[#D5CAAC] active:scale-[0.98] text-sm font-medium transition-all duration-150"
           >
             Bulk Import
           </Link>
@@ -222,7 +208,7 @@ export default function AdminDashboard() {
                       type="button"
                       onClick={handleIsbnLookup}
                       disabled={isbnLoading || !form.isbn.trim()}
-                      className="px-3 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap flex items-center gap-1.5"
+                      className="px-3 py-2.5 bg-gray-900 text-white rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none transition-all duration-150 text-sm whitespace-nowrap flex items-center gap-1.5"
                     >
                       {isbnLoading ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
@@ -312,10 +298,10 @@ export default function AdminDashboard() {
 
                 <button
                   type="submit"
-                  disabled={submitting}
-                  className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={addMutation.isPending}
+                  className="w-full bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none transition-all duration-150 flex items-center justify-center gap-2"
                 >
-                  {submitting ? (
+                  {addMutation.isPending ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                       Adding Book...
@@ -335,10 +321,10 @@ export default function AdminDashboard() {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Book Collection</h2>
                   <p className="text-sm text-gray-500 mt-0.5">
-                    {loading ? 'Loading...' : `${books.length} ${books.length === 1 ? 'book' : 'books'} in your library`}
+                    {isLoading ? 'Loading...' : `${books.length} ${books.length === 1 ? 'book' : 'books'} in your library`}
                   </p>
                 </div>
-                {!loading && (
+                {!isLoading && (
                   <span className="bg-[#F0EAD6] text-gray-700 text-sm font-medium px-3 py-1 rounded-md">
                     {books.length} Total
                   </span>
@@ -346,7 +332,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="p-6">
-                {loading ? (
+                {isLoading ? (
                   <div className="flex items-center justify-center py-20">
                     <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-900 border-t-transparent" />
                   </div>
@@ -415,7 +401,7 @@ export default function AdminDashboard() {
               </div>
               <button
                 onClick={closeEditModal}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-[0.95] transition-all duration-150"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -441,7 +427,7 @@ export default function AdminDashboard() {
                     type="button"
                     onClick={handleEditIsbnLookup}
                     disabled={editIsbnLoading || !editForm.isbn.trim()}
-                    className="px-3 py-2.5 bg-gray-900 text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-sm whitespace-nowrap"
+                    className="px-3 py-2.5 bg-gray-900 text-white rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none transition-all duration-150 text-sm whitespace-nowrap"
                   >
                     {editIsbnLoading ? '...' : 'Lookup'}
                   </button>
@@ -497,16 +483,16 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="flex-1 border border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                  className="flex-1 border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={editSubmitting}
-                  className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg hover:bg-gray-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  disabled={updateMutation.isPending}
+                  className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none transition-all duration-150 flex items-center justify-center gap-2"
                 >
-                  {editSubmitting ? (
+                  {updateMutation.isPending ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                       Saving...

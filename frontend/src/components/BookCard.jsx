@@ -90,7 +90,7 @@ export default function BookCard({ book, onDelete, onEdit }) {
           {onEdit && (
             <button
               onClick={() => onEdit(book)}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 active:scale-[0.95] transition-all duration-150 focus:outline-none"
               title="Edit book"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,10 +103,10 @@ export default function BookCard({ book, onDelete, onEdit }) {
             <button
               onClick={handleDelete}
               disabled={isDeleting}
-              className={`p-1.5 rounded-lg transition-colors focus:outline-none ${
+              className={`p-1.5 rounded-lg transition-all duration-150 focus:outline-none ${
                 isDeleting
                   ? 'text-red-300 cursor-not-allowed'
-                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                  : 'text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-[0.95]'
               }`}
               title={isDeleting ? 'Deleting...' : 'Delete book'}
             >
