@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const reviewRepo = require('../repositories/reviewRepository');
 const bookRepo = require('../repositories/bookRepository');
 
@@ -21,6 +22,7 @@ exports.addReview = async ({ rating, comment, tags, pros, cons, imageUrl, userId
     book: bookId,
   });
   await recalculateAverageRating(bookId);
+  logger.info({ reviewId: review._id, userId, bookId }, 'Review added');
   return review;
 };
 
@@ -73,6 +75,7 @@ exports.deleteReview = async ({ reviewId, userId }) => {
   const bookId = review.book;
   await review.deleteOne();
   await recalculateAverageRating(bookId);
+  logger.info({ reviewId, userId, bookId }, 'Review deleted');
 };
 
 exports.recalculateAverageRating = recalculateAverageRating;

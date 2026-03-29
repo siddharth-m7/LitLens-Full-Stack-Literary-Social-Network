@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const bookRepo = require('../repositories/bookRepository');
 
 exports.getAllBooks = async ({ search, genre, minRating, sort, page, limit }) => {
@@ -50,7 +51,7 @@ exports.getBookById = async (id) => {
 };
 
 exports.createBook = async ({ title, author, description, genre, coverImage, createdBy }) => {
-  return bookRepo.create({
+  const book = await bookRepo.create({
     title,
     author,
     description,
@@ -58,6 +59,8 @@ exports.createBook = async ({ title, author, description, genre, coverImage, cre
     coverImage: coverImage || '',
     createdBy,
   });
+  logger.info({ bookId: book._id, title, createdBy }, 'Book created');
+  return book;
 };
 
 exports.updateBook = async (id, { title, author, description, genre, coverImage }) => {
@@ -78,4 +81,5 @@ exports.deleteBook = async (id) => {
   const book = await bookRepo.findByIdRaw(id);
   if (!book) throw Object.assign(new Error('Book not found'), { status: 404 });
   await book.deleteOne();
+  logger.info({ bookId: id, title: book.title }, 'Book deleted');
 };

@@ -1,3 +1,4 @@
+const logger = require('../config/logger');
 const userRepo = require('../repositories/userRepository');
 const bookRepo = require('../repositories/bookRepository');
 const reviewRepo = require('../repositories/reviewRepository');
@@ -14,6 +15,12 @@ exports.toggleBanUser = async (targetId, currentUserId) => {
 
   user.banned = !user.banned;
   await user.save();
+
+  logger.warn(
+    { targetId, bannedBy: currentUserId, banned: user.banned },
+    user.banned ? 'User banned' : 'User unbanned'
+  );
+
   return user;
 };
 
@@ -23,6 +30,9 @@ exports.promoteUser = async (targetId) => {
 
   user.role = 'admin';
   await user.save();
+
+  logger.info({ targetId }, 'User promoted to admin');
+
   return user;
 };
 

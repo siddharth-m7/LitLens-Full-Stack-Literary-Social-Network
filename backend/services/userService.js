@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const userRepo = require('../repositories/userRepository');
 const reviewRepo = require('../repositories/reviewRepository');
 const favoriteRepo = require('../repositories/favoriteRepository');
@@ -57,6 +58,8 @@ exports.deleteAccount = async (userId) => {
     commentRepo.deleteMany({ user: userId }),
     reviewLikeRepo.deleteMany({ user: userId }),
   ]);
+
+  logger.info({ userId, affectedBooks: affectedBookIds.length }, 'Account deleted');
 
   if (affectedBookIds.length > 0) {
     const ratings = await reviewRepo.aggregate([

@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const mailer = require('../config/mailer');
 const userRepo = require('../repositories/userRepository');
+const logger = require('../config/logger');
 
 function generateTokens(userId, role) {
   const accessToken = jwt.sign({ id: userId, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
@@ -21,6 +22,8 @@ exports.register = async ({ name, email, password }) => {
   user.refreshToken = refreshToken;
   await user.save();
 
+  logger.info({ userId: user._id, email: user.email }, 'User registered');
+
   return {
     token: accessToken,
     refreshToken,
@@ -30,15 +33,26 @@ exports.register = async ({ name, email, password }) => {
 
 exports.login = async ({ email, password }) => {
   const user = await userRepo.findByEmail(email);
-  if (!user) throw Object.assign(new Error('Invalid credentials'), { status: 400 });
-  if (user.banned) throw Object.assign(new Error('Your account has been banned.'), { status: 403 });
+  if (!user) {
+    logger.warn({ email }, 'Login attempt with unknown email');
+    throw Object.assign(new Error('Invalid credentials'), { status: 400 });
+  }
+  if (user.banned) {
+    logger.warn({ userId: user._id, email }, 'Login attempt by banned user');
+    throw Object.assign(new Error('Your account has been banned.'), { status: 403 });
+  }
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) throw Object.assign(new Error('Invalid credentials'), { status: 400 });
+  if (!isMatch) {
+    logger.warn({ userId: user._id, email }, 'Login attempt with wrong password');
+    throw Object.assign(new Error('Invalid credentials'), { status: 400 });
+  }
 
   const { accessToken, refreshToken } = generateTokens(user._id, user.role);
   user.refreshToken = refreshToken;
   await user.save();
+
+  logger.info({ userId: user._id, email }, 'User logged in');
 
   return {
     token: accessToken,
@@ -92,6 +106,8 @@ exports.forgotPassword = async (email) => {
 
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${rawToken}`;
 
+  logger.info({ userId: user._id, email: user.email }, 'Password reset email sent');
+
   await mailer.sendMail({
     from: process.env.SMTP_FROM || `"Book Review App" <${process.env.SMTP_USER}>`,
     to: user.email,
@@ -124,4 +140,6 @@ exports.resetPassword = async ({ token, password }) => {
   user.passwordResetExpiry = null;
   user.refreshToken = null; // invalidate all sessions
   await user.save();
+
+  logger.info({ userId: user._id }, 'Password reset successfully');
 };
