@@ -1,13 +1,11 @@
-const ReadingList = require('../models/ReadingList');
+const readingListService = require('../services/readingListService');
 
-// Add or update a book's status in the reading list
 exports.upsertReadingList = async (req, res) => {
   try {
-    const { status } = req.body;
-    const entry = await ReadingList.findOneAndUpdate(
-      { user: req.user.id, book: req.params.bookId },
-      { status },
-      { upsert: true, new: true }
+    const entry = await readingListService.upsertReadingList(
+      req.user.id,
+      req.params.bookId,
+      req.body.status
     );
     res.json(entry);
   } catch (err) {
@@ -15,33 +13,28 @@ exports.upsertReadingList = async (req, res) => {
   }
 };
 
-// Get full reading list for the logged-in user
 exports.getUserReadingList = async (req, res) => {
   try {
-    const list = await ReadingList.find({ user: req.user.id })
-      .populate('book', 'title author coverImage genre averageRating')
-      .sort({ updatedAt: -1 });
+    const list = await readingListService.getUserReadingList(req.user.id);
     res.json(list);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Remove a book from the reading list
 exports.removeFromReadingList = async (req, res) => {
   try {
-    await ReadingList.deleteOne({ user: req.user.id, book: req.params.bookId });
+    await readingListService.removeFromReadingList(req.user.id, req.params.bookId);
     res.json({ message: 'Removed from reading list' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get reading list status for a single book
 exports.getReadingListStatus = async (req, res) => {
   try {
-    const entry = await ReadingList.findOne({ user: req.user.id, book: req.params.bookId });
-    res.json({ status: entry ? entry.status : null });
+    const result = await readingListService.getReadingListStatus(req.user.id, req.params.bookId);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
