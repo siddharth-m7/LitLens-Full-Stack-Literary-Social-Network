@@ -6,9 +6,7 @@ exports.findWithFilter = ({ filter, sortBy, skip, limitNum }) =>
 exports.countDocuments = (filter) => Book.countDocuments(filter);
 
 exports.findById = (id) =>
-  Book.findById(id)
-    .populate('createdBy', 'name')
-    .populate({ path: 'reviews', populate: { path: 'user', select: 'name' } });
+  Book.findById(id).populate('createdBy', 'name');
 
 exports.findByIdRaw = (id) => Book.findById(id);
 

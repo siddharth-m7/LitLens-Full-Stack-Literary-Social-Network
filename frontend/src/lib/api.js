@@ -69,8 +69,8 @@ export const toggleLike = (reviewId) =>
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
-export const fetchComments = (reviewId) =>
-  axios.get(`${BASE}/reviews/${reviewId}/comments`).then(r => r.data);
+export const fetchComments = (reviewId, { page = 1, limit = 5 } = {}) =>
+  axios.get(`${BASE}/reviews/${reviewId}/comments?page=${page}&limit=${limit}`).then(r => r.data);
 
 export const addComment = ({ reviewId, text }) =>
   axios.post(`${BASE}/reviews/${reviewId}/comments`, { text }, { headers: authHeaders() }).then(r => r.data);
@@ -125,6 +125,15 @@ export const fetchFollowers = (userId) =>
 
 export const fetchFollowing = (userId) =>
   axios.get(`${BASE}/follow/${userId}/following`).then(r => r.data);
+
+export const fetchBookReviews = (bookId, { page = 1, limit = 5 } = {}) =>
+  axios.get(`${BASE}/books/${bookId}/reviews?page=${page}&limit=${limit}`).then(r => r.data);
+
+export const fetchUserReviews = (userId, { page = 1, limit = 5 } = {}) =>
+  axios.get(`${BASE}/users/${userId}/reviews?page=${page}&limit=${limit}`).then(r => r.data);
+
+export const fetchMyReviews = ({ page = 1, limit = 5 } = {}) =>
+  axios.get(`${BASE}/reviews/my?page=${page}&limit=${limit}`, { headers: authHeaders() }).then(r => r.data);
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 

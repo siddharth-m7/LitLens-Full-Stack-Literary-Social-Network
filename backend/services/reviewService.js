@@ -78,4 +78,32 @@ exports.deleteReview = async ({ reviewId, userId }) => {
   logger.info({ reviewId, userId, bookId }, 'Review deleted');
 };
 
+exports.getBookReviews = async ({ bookId, page, limit }) => {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(20, Math.max(1, parseInt(limit) || 5));
+  const skip = (pageNum - 1) * limitNum;
+
+  const [reviews, totalCount] = await Promise.all([
+    reviewRepo.findByBookPaginated({ bookId, skip, limitNum }),
+    reviewRepo.countByBook(bookId),
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  return { reviews, totalCount, page: pageNum, limit: limitNum, totalPages, hasNextPage: pageNum < totalPages };
+};
+
+exports.getPublicUserReviews = async ({ userId, page, limit }) => {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(20, Math.max(1, parseInt(limit) || 5));
+  const skip = (pageNum - 1) * limitNum;
+
+  const [reviews, totalCount] = await Promise.all([
+    reviewRepo.findByUserPublicPaginated({ userId, skip, limitNum }),
+    reviewRepo.countByUser(userId),
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  return { reviews, totalCount, page: pageNum, limit: limitNum, totalPages, hasNextPage: pageNum < totalPages };
+};
+
 exports.recalculateAverageRating = recalculateAverageRating;

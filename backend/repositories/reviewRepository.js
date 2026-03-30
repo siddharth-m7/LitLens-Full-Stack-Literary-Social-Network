@@ -6,6 +6,22 @@ exports.findById = (id) => Review.findById(id);
 
 exports.findByBook = (bookId) => Review.find({ book: bookId });
 
+exports.findByBookPaginated = ({ bookId, skip, limitNum }) =>
+  Review.find({ book: bookId })
+    .populate('user', 'name')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limitNum);
+
+exports.countByBook = (bookId) => Review.countDocuments({ book: bookId });
+
+exports.findByUserPublicPaginated = ({ userId, skip, limitNum }) =>
+  Review.find({ user: userId })
+    .populate('book', 'title author coverImage')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limitNum);
+
 exports.findByUser = ({ userId, skip, limitNum }) =>
   Review.find({ user: userId })
     .populate('book', 'title author')

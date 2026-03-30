@@ -7,6 +7,15 @@ exports.findByReview = (reviewId) =>
     .populate('user', 'name')
     .sort({ createdAt: 1 });
 
+exports.findByReviewPaginated = ({ reviewId, skip, limitNum }) =>
+  Comment.find({ review: reviewId })
+    .populate('user', 'name')
+    .sort({ createdAt: 1 })
+    .skip(skip)
+    .limit(limitNum);
+
+exports.countByReview = (reviewId) => Comment.countDocuments({ review: reviewId });
+
 exports.findById = (id) => Comment.findById(id);
 
 exports.deleteMany = (filter) => Comment.deleteMany(filter);

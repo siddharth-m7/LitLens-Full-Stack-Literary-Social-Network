@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchPublicProfile, toggleFollow, fetchFollowStatus } from '../lib/api';
+import { fetchPublicProfile, fetchUserReviews, toggleFollow, fetchFollowStatus } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import Pagination from '../components/Pagination';
 
 const RL_LABELS = { want_to_read: 'Want to Read', reading: 'Currently Reading', finished: 'Finished' };
 const RL_COLORS = {
@@ -18,11 +20,19 @@ export default function UserProfile() {
   const queryClient = useQueryClient();
 
   const isOwnProfile = currentUser?.id === userId;
+  const [reviewPage, setReviewPage] = useState(1);
 
   const { data: profileData, isLoading } = useQuery({
     queryKey: queryKeys.publicProfile(userId),
     queryFn: () => fetchPublicProfile(userId),
     enabled: !!userId,
+  });
+
+  const { data: reviewsData } = useQuery({
+    queryKey: queryKeys.userReviews(userId, reviewPage),
+    queryFn: () => fetchUserReviews(userId, { page: reviewPage, limit: 5 }),
+    enabled: !!userId,
+    keepPreviousData: true,
   });
 
   const { data: followData } = useQuery({
@@ -69,7 +79,8 @@ export default function UserProfile() {
     );
   }
 
-  const { user, reviews, favorites, readingList, badges = [], followerCount, followingCount } = profileData;
+  const { user, favorites, readingList, badges = [], followerCount, followingCount, reviewCount = 0 } = profileData;
+  const reviews = reviewsData?.reviews ?? [];
 
   return (
     <div className="min-h-screen bg-[#FAF6EE]">
@@ -121,7 +132,7 @@ export default function UserProfile() {
                   </div>
                   <div className="w-px h-8 bg-[#E8E0CE]" />
                   <div className="text-center">
-                    <div className="text-xl font-bold text-gray-900">{reviews.length}</div>
+                    <div className="text-xl font-bold text-gray-900">{reviewsData?.totalCount ?? reviewCount}</div>
                     <div className="text-gray-500 text-xs">Reviews</div>
                   </div>
                 </div>
@@ -159,7 +170,7 @@ export default function UserProfile() {
         <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
           <div className="px-6 sm:px-8 py-5 border-b border-[#E8E0CE] flex items-center justify-between">
             <h2 className="text-xl font-semibold text-gray-900">Reviews</h2>
-            <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">{reviews.length}</span>
+            <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">{reviewsData?.totalCount ?? reviewCount}</span>
           </div>
           <div className="p-6 sm:p-8">
             {reviews.length === 0 ? (
@@ -196,6 +207,14 @@ export default function UserProfile() {
                   </Link>
                 ))}
               </div>
+            )}
+            {(reviewsData?.totalPages || 0) > 1 && (
+              <Pagination
+                page={reviewPage}
+                totalPages={reviewsData.totalPages}
+                onPrev={() => setReviewPage(p => p - 1)}
+                onNext={() => setReviewPage(p => p + 1)}
+              />
             )}
           </div>
         </div>

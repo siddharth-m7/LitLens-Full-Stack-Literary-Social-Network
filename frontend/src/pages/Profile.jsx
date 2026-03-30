@@ -9,11 +9,13 @@ import {
   fetchReadingList,
   fetchFollowers,
   fetchFollowing,
+  fetchMyReviews,
   updateReview,
   deleteReview,
   deleteAccount,
 } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import Pagination from '../components/Pagination';
 
 const RL_LABELS = {
   want_to_read: 'Want to Read',
@@ -45,6 +47,7 @@ export default function Profile() {
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [followModal, setFollowModal] = useState(null); // 'followers' | 'following' | null
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [reviewPage, setReviewPage] = useState(1);
 
   const { data: profileData } = useQuery({
     queryKey: queryKeys.profile(),
@@ -61,10 +64,18 @@ export default function Profile() {
     milestones = [],
     followerCount = 0,
     followingCount = 0,
-    reviews = [],
+    reviewCount: profileReviewCount = 0,
     favorites = [],
     readingList = [],
   } = profileData ?? {};
+
+  const { data: reviewsData } = useQuery({
+    queryKey: queryKeys.myReviews(reviewPage),
+    queryFn: () => fetchMyReviews({ page: reviewPage, limit: 5 }),
+    enabled: !!user && profileUserRole === 'user',
+  });
+
+  const reviews = reviewsData?.reviews ?? [];
 
   const { data: followersList = [], isLoading: loadingFollowers } = useQuery({
     queryKey: queryKeys.followers(profileUserId),
@@ -85,7 +96,7 @@ export default function Profile() {
   const updateReviewMutation = useMutation({
     mutationFn: updateReview,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
+      queryClient.invalidateQueries({ queryKey: ['myReviews'] });
       toast.success('Review updated');
     },
     onError: () => toast.error('Failed to update review'),
@@ -105,7 +116,9 @@ export default function Profile() {
   const deleteReviewMutation = useMutation({
     mutationFn: deleteReview,
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myReviews'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
+      setReviewPage(1);
       toast.success('Review deleted');
     },
     onError: () => toast.error('Failed to delete review'),
@@ -179,7 +192,7 @@ export default function Profile() {
                 {[
                   { label: 'Followers', value: followerCount, onClick: () => setFollowModal('followers'), clickable: true },
                   { label: 'Following', value: followingCount, onClick: () => setFollowModal('following'), clickable: true },
-                  { label: 'Reviews',   value: reviews.length, clickable: false },
+                  { label: 'Reviews',   value: profileReviewCount, clickable: false },
                 ].map(({ label, value, onClick, clickable }) => (
                   clickable ? (
                     <button key={label} onClick={onClick} className="group flex flex-col items-center gap-0.5 py-1 hover:bg-[#FAF6EE] rounded-lg transition-colors">
@@ -284,7 +297,7 @@ export default function Profile() {
                 <p className="text-gray-500 text-sm mt-0.5">Manage and edit your book reviews</p>
               </div>
               <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                {reviews.length}
+                {reviewsData?.totalCount ?? profileReviewCount}
               </span>
             </div>
 
@@ -466,6 +479,16 @@ export default function Profile() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+              {(reviewsData?.totalPages || 0) > 1 && (
+                <div className="mt-4">
+                  <Pagination
+                    page={reviewPage}
+                    totalPages={reviewsData.totalPages}
+                    onPrev={() => setReviewPage(p => p - 1)}
+                    onNext={() => setReviewPage(p => p + 1)}
+                  />
                 </div>
               )}
             </div>

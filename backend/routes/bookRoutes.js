@@ -7,6 +7,7 @@ const {
   updateBook,
   deleteBook
 } = require('../controllers/bookController');
+const { getBookReviews } = require('../controllers/reviewController');
 
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
@@ -92,6 +93,7 @@ router.get('/', getAllBooks);
  *         description: Book not found
  */
 router.get('/:id', getBookById);
+router.get('/:id/reviews', getBookReviews);
 
 /**
  * @swagger

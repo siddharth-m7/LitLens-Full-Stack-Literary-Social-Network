@@ -5,8 +5,18 @@ exports.addComment = async ({ reviewId, userId, text }) => {
   return comment.populate('user', 'name');
 };
 
-exports.getComments = async (reviewId) => {
-  return commentRepo.findByReview(reviewId);
+exports.getComments = async ({ reviewId, page, limit }) => {
+  const pageNum = Math.max(1, parseInt(page) || 1);
+  const limitNum = Math.min(50, Math.max(1, parseInt(limit) || 10));
+  const skip = (pageNum - 1) * limitNum;
+
+  const [comments, totalCount] = await Promise.all([
+    commentRepo.findByReviewPaginated({ reviewId, skip, limitNum }),
+    commentRepo.countByReview(reviewId),
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limitNum);
+  return { comments, totalCount, page: pageNum, limit: limitNum, totalPages, hasNextPage: pageNum < totalPages };
 };
 
 exports.deleteComment = async ({ commentId, userId }) => {

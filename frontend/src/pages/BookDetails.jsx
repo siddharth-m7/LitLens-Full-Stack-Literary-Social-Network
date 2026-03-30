@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  fetchBook,
+  fetchBook, fetchBookReviews,
   fetchFavoriteStatus, toggleFavorite,
   fetchReadingStatus, setReadingStatus, removeFromReadingList,
   fetchLikeStatus, toggleLike,
@@ -12,6 +12,7 @@ import {
   addReview, updateReview, deleteReview,
 } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import Pagination from '../components/Pagination';
 
 const RL_LABELS = {
   want_to_read: 'Want to Read',
@@ -36,10 +37,13 @@ export default function BookDetails() {
   const [showRlDropdown, setShowRlDropdown] = useState(false);
   const rlDropdownRef = useRef(null);
 
+  // Reviews pagination
+  const [reviewPage, setReviewPage] = useState(1);
   // Likes { [reviewId]: { liked, likeCount } } — local optimistic state
   const [likeData, setLikeData] = useState({});
-  // Comments { [reviewId]: Comment[] }
+  // Comments { [reviewId]: { comments, hasNextPage, nextPage } }
   const [commentData, setCommentData] = useState({});
+  const [commentLoadingMore, setCommentLoadingMore] = useState({});
   const [expandedComments, setExpandedComments] = useState({});
   const [commentInputs, setCommentInputs] = useState({});
   const [commentLoading, setCommentLoading] = useState({});
@@ -50,6 +54,13 @@ export default function BookDetails() {
     queryKey: queryKeys.book(id),
     queryFn: () => fetchBook(id),
     enabled: !!id,
+  });
+
+  const { data: reviewsData, isLoading: reviewsLoading } = useQuery({
+    queryKey: queryKeys.bookReviews(id, reviewPage),
+    queryFn: () => fetchBookReviews(id, { page: reviewPage, limit: 5 }),
+    enabled: !!id,
+    keepPreviousData: true,
   });
 
   const { data: favData } = useQuery({
@@ -67,11 +78,11 @@ export default function BookDetails() {
   const isFavorited = favData?.favorited ?? false;
   const readingStatus = rlData?.status ?? null;
 
-  // After book loads, fetch like status for all reviews in parallel
+  // Fetch like status for current page of reviews
   useEffect(() => {
-    if (!book?.reviews?.length) return;
+    if (!reviewsData?.reviews?.length) return;
     Promise.all(
-      book.reviews.map(r =>
+      reviewsData.reviews.map(r =>
         fetchLikeStatus(r._id)
           .then(data => ({ id: r._id, ...data }))
           .catch(() => ({ id: r._id, liked: false, likeCount: 0 }))
@@ -79,9 +90,9 @@ export default function BookDetails() {
     ).then(results => {
       const map = {};
       results.forEach(({ id, liked, likeCount }) => { map[id] = { liked, likeCount }; });
-      setLikeData(map);
+      setLikeData(prev => ({ ...prev, ...map }));
     });
-  }, [book]);
+  }, [reviewsData]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -95,10 +106,16 @@ export default function BookDetails() {
   }, []);
 
   // ── Mutations ─────────────────────────────────────────────────────────────
+  const invalidateReviews = () => {
+    queryClient.invalidateQueries({ queryKey: ['bookReviews', id] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+    setReviewPage(1);
+  };
+
   const addReviewMutation = useMutation({
     mutationFn: addReview,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+      invalidateReviews();
       setForm(EMPTY_FORM);
       toast.success('Review submitted!');
     },
@@ -108,7 +125,7 @@ export default function BookDetails() {
   const updateReviewMutation = useMutation({
     mutationFn: updateReview,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+      invalidateReviews();
       setEditing(null);
       setForm(EMPTY_FORM);
       toast.success('Review updated!');
@@ -119,7 +136,7 @@ export default function BookDetails() {
   const deleteReviewMutation = useMutation({
     mutationFn: deleteReview,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.book(id) });
+      invalidateReviews();
       toast.success('Review deleted');
     },
     onError: () => toast.error('Failed to delete review'),
@@ -221,11 +238,35 @@ export default function BookDetails() {
     setExpandedComments(prev => ({ ...prev, [reviewId]: nowExpanded }));
     if (nowExpanded && !commentData[reviewId]) {
       try {
-        const data = await fetchComments(reviewId);
-        setCommentData(prev => ({ ...prev, [reviewId]: data }));
+        const data = await fetchComments(reviewId, { page: 1, limit: 5 });
+        setCommentData(prev => ({
+          ...prev,
+          [reviewId]: { comments: data.comments, hasNextPage: data.hasNextPage, nextPage: 2, totalCount: data.totalCount },
+        }));
       } catch {
-        setCommentData(prev => ({ ...prev, [reviewId]: [] }));
+        setCommentData(prev => ({ ...prev, [reviewId]: { comments: [], hasNextPage: false, nextPage: 2, totalCount: 0 } }));
       }
+    }
+  };
+
+  const handleLoadMoreComments = async (reviewId) => {
+    const current = commentData[reviewId];
+    setCommentLoadingMore(prev => ({ ...prev, [reviewId]: true }));
+    try {
+      const data = await fetchComments(reviewId, { page: current.nextPage, limit: 5 });
+      setCommentData(prev => ({
+        ...prev,
+        [reviewId]: {
+          comments: [...prev[reviewId].comments, ...data.comments],
+          hasNextPage: data.hasNextPage,
+          nextPage: current.nextPage + 1,
+          totalCount: data.totalCount,
+        },
+      }));
+    } catch {
+      toast.error('Failed to load more comments');
+    } finally {
+      setCommentLoadingMore(prev => ({ ...prev, [reviewId]: false }));
     }
   };
 
@@ -235,7 +276,14 @@ export default function BookDetails() {
     setCommentLoading(prev => ({ ...prev, [reviewId]: true }));
     try {
       const data = await addComment({ reviewId, text });
-      setCommentData(prev => ({ ...prev, [reviewId]: [...(prev[reviewId] || []), data] }));
+      setCommentData(prev => ({
+        ...prev,
+        [reviewId]: {
+          ...prev[reviewId],
+          comments: [...(prev[reviewId]?.comments || []), data],
+          totalCount: (prev[reviewId]?.totalCount || 0) + 1,
+        },
+      }));
       setCommentInputs(prev => ({ ...prev, [reviewId]: '' }));
     } catch {
       toast.error('Failed to post comment');
@@ -249,7 +297,11 @@ export default function BookDetails() {
       await deleteComment(commentId);
       setCommentData(prev => ({
         ...prev,
-        [reviewId]: prev[reviewId].filter(c => c._id !== commentId),
+        [reviewId]: {
+          ...prev[reviewId],
+          comments: prev[reviewId].comments.filter(c => c._id !== commentId),
+          totalCount: Math.max(0, (prev[reviewId]?.totalCount || 1) - 1),
+        },
       }));
     } catch {
       toast.error('Failed to delete comment');
@@ -651,13 +703,13 @@ export default function BookDetails() {
               Reader Reviews
             </h2>
             <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-              {book.reviews?.length || 0}
+              {reviewsData?.totalCount ?? book?.reviewCount ?? 0}
             </span>
           </div>
 
           <div className="p-6">
             {/* Sort controls */}
-            {book.reviews?.length > 1 && (
+            {(reviewsData?.totalCount || 0) > 1 && (
               <div className="flex items-center gap-2 flex-wrap mb-5">
                 <span className="text-sm text-gray-500">Sort:</span>
                 {[
@@ -681,13 +733,19 @@ export default function BookDetails() {
               </div>
             )}
 
-            {book.reviews?.length === 0 ? (
+            {reviewsLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-24 bg-[#F0EAD6] rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : !reviewsData?.reviews?.length ? (
               <div className="text-center py-10">
                 <p className="text-gray-500 font-medium mb-1">No reviews yet</p>
                 <p className="text-gray-400 text-sm">Be the first to share your thoughts about this book.</p>
               </div>
             ) : (() => {
-              const sortedReviews = [...book.reviews].sort((a, b) => {
+              const sortedReviews = [...reviewsData.reviews].sort((a, b) => {
                 if (reviewSort === 'newest') return new Date(b.createdAt) - new Date(a.createdAt);
                 if (reviewSort === 'helpful') return (likeData[b._id]?.likeCount || 0) - (likeData[a._id]?.likeCount || 0);
                 if (reviewSort === 'highest') return b.rating - a.rating;
@@ -698,7 +756,8 @@ export default function BookDetails() {
                 <div className="space-y-4">
                   {sortedReviews.map((r) => {
                     const like = likeData[r._id] || { liked: false, likeCount: 0 };
-                    const comments = commentData[r._id] || [];
+                    const commentsObj = commentData[r._id] || { comments: [], hasNextPage: false, nextPage: 2, totalCount: 0 };
+                    const comments = commentsObj.comments;
                     const isExpanded = !!expandedComments[r._id];
                     const commentInput = commentInputs[r._id] || '';
                     const isSubmittingComment = !!commentLoading[r._id];
@@ -835,7 +894,7 @@ export default function BookDetails() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                               </svg>
                               {isExpanded ? 'Hide' : 'Comments'}
-                              {isExpanded && comments.length > 0 && <span className="font-semibold">{comments.length}</span>}
+                              {commentsObj.totalCount > 0 && <span className="font-semibold">{commentsObj.totalCount}</span>}
                             </button>
                           </div>
                         </div>
@@ -880,6 +939,19 @@ export default function BookDetails() {
                               </div>
                             )}
 
+                            {/* Load more comments */}
+                            {commentsObj.hasNextPage && (
+                              <button
+                                onClick={() => handleLoadMoreComments(r._id)}
+                                disabled={commentLoadingMore[r._id]}
+                                className="text-xs text-gray-500 hover:text-gray-900 font-medium mb-4 flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {commentLoadingMore[r._id] ? (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-gray-500 border-t-transparent" />
+                                ) : '↓'} Load more comments
+                              </button>
+                            )}
+
                             {/* Comment input */}
                             {user ? (
                               <div className="flex items-center gap-2">
@@ -914,6 +986,12 @@ export default function BookDetails() {
                       </div>
                     );
                   })}
+                  <Pagination
+                    page={reviewPage}
+                    totalPages={reviewsData?.totalPages || 1}
+                    onPrev={() => setReviewPage(p => p - 1)}
+                    onNext={() => setReviewPage(p => p + 1)}
+                  />
                 </div>
               );
             })()}

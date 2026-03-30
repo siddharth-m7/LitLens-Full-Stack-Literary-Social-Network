@@ -1,5 +1,23 @@
 const reviewService = require('../services/reviewService');
 
+exports.getBookReviews = async (req, res) => {
+  try {
+    const result = await reviewService.getBookReviews({ bookId: req.params.id, ...req.query });
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
+exports.getPublicUserReviews = async (req, res) => {
+  try {
+    const result = await reviewService.getPublicUserReviews({ userId: req.params.id, ...req.query });
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ message: err.message });
+  }
+};
+
 exports.addReview = async (req, res) => {
   try {
     const review = await reviewService.addReview({

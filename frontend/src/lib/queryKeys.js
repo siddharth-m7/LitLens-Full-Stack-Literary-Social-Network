@@ -2,10 +2,13 @@ export const queryKeys = {
   // Books
   books: (filters) => ['books', filters],
   book: (id) => ['book', id],
+  bookReviews: (bookId, page) => ['bookReviews', bookId, page],
 
   // Reviews
+  myReviews: (page) => ['myReviews', page],
+  userReviews: (userId, page) => ['userReviews', userId, page],
   likeStatus: (reviewId) => ['likeStatus', reviewId],
-  comments: (reviewId) => ['comments', reviewId],
+  comments: (reviewId, page) => ['comments', reviewId, page],
 
   // Favorites & Reading List
   favoriteStatus: (bookId) => ['favoriteStatus', bookId],

@@ -26,15 +26,14 @@ exports.getCurrentUser = async (userId) => {
   const user = await userRepo.findByIdExcludePassword(userId);
   if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
 
-  const [reviews, earlyAdopterRank, topIds, followerCount, followingCount] = await Promise.all([
-    reviewRepo.findByUserWithBook(userId),
+  const [reviewCount, earlyAdopterRank, topIds, followerCount, followingCount] = await Promise.all([
+    reviewRepo.countByUser(userId),
     userRepo.countDocuments({ createdAt: { $lt: user.createdAt } }),
     getTopReviewerIds(),
     followRepo.countFollowers(userId),
     followRepo.countFollowing(userId),
   ]);
 
-  const reviewCount = reviews.length;
   const badges = computeBadges({
     reviewCount,
     isEarlyAdopter: earlyAdopterRank < 50,
@@ -42,7 +41,7 @@ exports.getCurrentUser = async (userId) => {
   });
   const milestones = computeMilestones(reviewCount);
 
-  return { ...user.toObject(), reviews, reviewCount, followerCount, followingCount, badges, milestones };
+  return { ...user.toObject(), reviewCount, followerCount, followingCount, badges, milestones };
 };
 
 exports.deleteAccount = async (userId) => {
@@ -94,7 +93,6 @@ exports.getPublicProfile = async (userId) => {
   if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
 
   const [
-    reviews,
     favorites,
     readingList,
     followerCount,
@@ -103,7 +101,6 @@ exports.getPublicProfile = async (userId) => {
     earlyAdopterRank,
     topIds,
   ] = await Promise.all([
-    reviewRepo.findByUserWithBook(userId),
     favoriteRepo.findByUser(userId),
     readingListRepo.findByUser(userId),
     followRepo.countFollowers(userId),
@@ -120,5 +117,5 @@ exports.getPublicProfile = async (userId) => {
   });
   const milestones = computeMilestones(reviewCount);
 
-  return { user, reviews, favorites, readingList, followerCount, followingCount, badges, milestones };
+  return { user, favorites, readingList, followerCount, followingCount, reviewCount, badges, milestones };
 };

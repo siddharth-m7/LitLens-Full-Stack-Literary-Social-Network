@@ -15,8 +15,8 @@ exports.addComment = async (req, res) => {
 
 exports.getComments = async (req, res) => {
   try {
-    const comments = await commentService.getComments(req.params.reviewId);
-    res.json(comments);
+    const result = await commentService.getComments({ reviewId: req.params.reviewId, ...req.query });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
