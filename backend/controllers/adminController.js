@@ -1,37 +1,22 @@
 const adminService = require('../services/adminService');
+const catchAsync = require('../utils/catchAsync');
 
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await adminService.getAllUsers();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+exports.getAllUsers = catchAsync(async (req, res) => {
+  const users = await adminService.getAllUsers();
+  res.json(users);
+});
 
-exports.toggleBanUser = async (req, res) => {
-  try {
-    const user = await adminService.toggleBanUser(req.params.id, req.user._id);
-    res.json(user);
-  } catch (err) {
-    res.status(err.status || 500).json({ message: err.message });
-  }
-};
+exports.toggleBanUser = catchAsync(async (req, res) => {
+  const user = await adminService.toggleBanUser(req.params.id, req.user._id);
+  res.json(user);
+});
 
-exports.promoteUser = async (req, res) => {
-  try {
-    const user = await adminService.promoteUser(req.params.id);
-    res.json(user);
-  } catch (err) {
-    res.status(err.status || 500).json({ message: err.message });
-  }
-};
+exports.promoteUser = catchAsync(async (req, res) => {
+  const user = await adminService.promoteUser(req.params.id);
+  res.json(user);
+});
 
-exports.getAnalytics = async (req, res) => {
-  try {
-    const result = await adminService.getAnalytics();
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+exports.getAnalytics = catchAsync(async (req, res) => {
+  const result = await adminService.getAnalytics();
+  res.json(result);
+});

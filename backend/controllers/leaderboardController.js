@@ -1,10 +1,7 @@
 const leaderboardService = require('../services/leaderboardService');
+const catchAsync = require('../utils/catchAsync');
 
-exports.getLeaderboard = async (req, res) => {
-  try {
-    const result = await leaderboardService.getLeaderboard();
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
+exports.getLeaderboard = catchAsync(async (req, res) => {
+  const result = await leaderboardService.getLeaderboard();
+  res.json(result);
+});
