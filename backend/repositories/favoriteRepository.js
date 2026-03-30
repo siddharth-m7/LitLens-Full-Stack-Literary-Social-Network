@@ -9,4 +9,5 @@ exports.findByUser = (userId) =>
     .populate('book', 'title author coverImage genre averageRating')
     .sort({ createdAt: -1 });
 
-exports.deleteMany = (filter) => Favorite.deleteMany(filter);
+exports.deleteMany = (filter, session) =>
+  Favorite.deleteMany(filter, session ? { session } : {});

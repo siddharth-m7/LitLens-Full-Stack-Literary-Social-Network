@@ -48,43 +48,56 @@ exports.deleteAccount = async (userId) => {
   const userReviews = await reviewRepo.findByUserSelectBook(userId);
   const affectedBookIds = [...new Set(userReviews.map((r) => r.book?.toString()).filter(Boolean))];
 
-  await Promise.all([
-    userRepo.findByIdAndDelete(userId),
-    followRepo.deleteMany({ $or: [{ follower: userId }, { following: userId }] }),
-    reviewRepo.deleteMany({ user: userId }),
-    favoriteRepo.deleteMany({ user: userId }),
-    readingListRepo.deleteMany({ user: userId }),
-    commentRepo.deleteMany({ user: userId }),
-    reviewLikeRepo.deleteMany({ user: userId }),
-  ]);
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
 
-  logger.info({ userId, affectedBooks: affectedBookIds.length }, 'Account deleted');
+    await userRepo.findByIdAndDelete(userId, session);
+    await followRepo.deleteMany({ $or: [{ follower: userId }, { following: userId }] }, session);
+    await reviewRepo.deleteMany({ user: userId }, session);
+    await favoriteRepo.deleteMany({ user: userId }, session);
+    await readingListRepo.deleteMany({ user: userId }, session);
+    await commentRepo.deleteMany({ user: userId }, session);
+    await reviewLikeRepo.deleteMany({ user: userId }, session);
 
-  if (affectedBookIds.length > 0) {
-    const ratings = await reviewRepo.aggregate([
-      {
-        $match: {
-          book: {
-            $in: affectedBookIds.map((id) => mongoose.Types.ObjectId.createFromHexString(id)),
+    if (affectedBookIds.length > 0) {
+      const ratings = await reviewRepo.aggregate(
+        [
+          {
+            $match: {
+              book: {
+                $in: affectedBookIds.map((id) => mongoose.Types.ObjectId.createFromHexString(id)),
+              },
+            },
+          },
+          { $group: { _id: '$book', avg: { $avg: '$rating' } } },
+        ],
+        session
+      );
+      const ratingMap = Object.fromEntries(ratings.map((r) => [r._id.toString(), r.avg]));
+
+      const bulkOps = affectedBookIds.map((id) => ({
+        updateOne: {
+          filter: { _id: id },
+          update: {
+            $set: {
+              averageRating:
+                ratingMap[id] != null ? Math.round(ratingMap[id] * 10) / 10 : null,
+            },
           },
         },
-      },
-      { $group: { _id: '$book', avg: { $avg: '$rating' } } },
-    ]);
-    const ratingMap = Object.fromEntries(ratings.map((r) => [r._id.toString(), r.avg]));
+      }));
+      await bookRepo.bulkWrite(bulkOps, session);
+    }
 
-    const bulkOps = affectedBookIds.map((id) => ({
-      updateOne: {
-        filter: { _id: id },
-        update: {
-          $set: {
-            averageRating:
-              ratingMap[id] != null ? Math.round(ratingMap[id] * 10) / 10 : null,
-          },
-        },
-      },
-    }));
-    await bookRepo.bulkWrite(bulkOps);
+    await session.commitTransaction();
+    logger.info({ userId, affectedBooks: affectedBookIds.length }, 'Account deleted');
+  } catch (err) {
+    await session.abortTransaction();
+    logger.error({ userId, err: err.message }, 'deleteAccount transaction aborted');
+    throw err;
+  } finally {
+    session.endSession();
   }
 };
 

@@ -18,4 +18,5 @@ exports.deleteOne = (userId, bookId) =>
 exports.findOne = (userId, bookId) =>
   ReadingList.findOne({ user: userId, book: bookId });
 
-exports.deleteMany = (filter) => ReadingList.deleteMany(filter);
+exports.deleteMany = (filter, session) =>
+  ReadingList.deleteMany(filter, session ? { session } : {});

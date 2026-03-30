@@ -310,7 +310,7 @@ export default function UserDashboard() {
                         )}
                       </div>
                       <span className="text-xs text-gray-400">
-                        {book.reviews?.length || 0} {book.reviews?.length === 1 ? 'review' : 'reviews'}
+                        {book.reviewCount || 0} {book.reviewCount === 1 ? 'review' : 'reviews'}
                       </span>
                     </div>
                   </div>

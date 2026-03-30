@@ -20,4 +20,5 @@ exports.getFollowing = (userId) =>
     .populate('following', 'name')
     .sort({ createdAt: -1 });
 
-exports.deleteMany = (filter) => Follow.deleteMany(filter);
+exports.deleteMany = (filter, session) =>
+  Follow.deleteMany(filter, session ? { session } : {});

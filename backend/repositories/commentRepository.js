@@ -18,4 +18,5 @@ exports.countByReview = (reviewId) => Comment.countDocuments({ review: reviewId 
 
 exports.findById = (id) => Comment.findById(id);
 
-exports.deleteMany = (filter) => Comment.deleteMany(filter);
+exports.deleteMany = (filter, session) =>
+  Comment.deleteMany(filter, session ? { session } : {});

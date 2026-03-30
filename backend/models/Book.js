@@ -7,6 +7,7 @@ const bookSchema = new mongoose.Schema({
   genre: { type: String, default: '' },
   coverImage: { type: String, default: '' },
   averageRating: { type: Number, default: null },
+  reviewCount: { type: Number, default: 0 },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, {
   timestamps: true,

@@ -8,4 +8,5 @@ exports.create = (userId, reviewId) =>
 
 exports.count = (reviewId) => ReviewLike.countDocuments({ review: reviewId });
 
-exports.deleteMany = (filter) => ReviewLike.deleteMany(filter);
+exports.deleteMany = (filter, session) =>
+  ReviewLike.deleteMany(filter, session ? { session } : {});

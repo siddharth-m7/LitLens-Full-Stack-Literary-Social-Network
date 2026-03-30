@@ -1,6 +1,5 @@
 const logger = require('../config/logger');
 const bookRepo = require('../repositories/bookRepository');
-const reviewRepo = require('../repositories/reviewRepository');
 
 exports.getAllBooks = async ({ search, genre, minRating, sort, page, limit }) => {
   const pageNum = Math.max(1, parseInt(page) || 1);
@@ -46,12 +45,9 @@ exports.getAllBooks = async ({ search, genre, minRating, sort, page, limit }) =>
 };
 
 exports.getBookById = async (id) => {
-  const [book, reviewCount] = await Promise.all([
-    bookRepo.findById(id),
-    reviewRepo.countByBook(id),
-  ]);
+  const book = await bookRepo.findById(id);
   if (!book) throw Object.assign(new Error('Book not found'), { status: 404 });
-  return { ...book.toObject(), reviewCount };
+  return book.toObject();
 };
 
 exports.createBook = async ({ title, author, description, genre, coverImage, createdBy }) => {

@@ -7,7 +7,7 @@ async function recalculateAverageRating(bookId) {
   const newAvg = reviews.length
     ? parseFloat((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1))
     : null;
-  await bookRepo.findByIdAndUpdate(bookId, { averageRating: newAvg });
+  await bookRepo.findByIdAndUpdate(bookId, { averageRating: newAvg, reviewCount: reviews.length });
 }
 
 exports.addReview = async ({ rating, comment, tags, pros, cons, imageUrl, userId, bookId }) => {

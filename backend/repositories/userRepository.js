@@ -12,7 +12,8 @@ exports.create = (data) => User.create(data);
 
 exports.findByIdAndUpdate = (id, update) => User.findByIdAndUpdate(id, update);
 
-exports.findByIdAndDelete = (id) => User.findByIdAndDelete(id);
+exports.findByIdAndDelete = (id, session) =>
+  User.findByIdAndDelete(id, session ? { session } : {});
 
 exports.findAll = () => User.find({}).select('-password').sort({ createdAt: -1 });
 

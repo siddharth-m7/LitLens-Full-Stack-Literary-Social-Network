@@ -41,6 +41,10 @@ exports.findByUserWithBook = (userId) =>
 exports.findByUserSelectBook = (userId) =>
   Review.find({ user: userId }).select('book').lean();
 
-exports.deleteMany = (filter) => Review.deleteMany(filter);
+exports.deleteMany = (filter, session) =>
+  Review.deleteMany(filter, session ? { session } : {});
 
-exports.aggregate = (pipeline) => Review.aggregate(pipeline);
+exports.aggregate = (pipeline, session) => {
+  const agg = Review.aggregate(pipeline);
+  return session ? agg.session(session) : agg;
+};

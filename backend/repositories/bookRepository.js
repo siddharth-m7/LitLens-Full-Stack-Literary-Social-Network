@@ -14,6 +14,7 @@ exports.create = (data) => Book.create(data);
 
 exports.findByIdAndUpdate = (id, update) => Book.findByIdAndUpdate(id, update);
 
-exports.bulkWrite = (ops) => Book.bulkWrite(ops);
+exports.bulkWrite = (ops, session) =>
+  Book.bulkWrite(ops, session ? { session } : {});
 
 exports.aggregate = (pipeline) => Book.aggregate(pipeline);
