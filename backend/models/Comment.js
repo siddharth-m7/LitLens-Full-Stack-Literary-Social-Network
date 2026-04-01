@@ -7,5 +7,7 @@ const commentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 commentSchema.index({ review: 1 });
+// Covers cascade deleteMany({ user: userId }) on account deletion
+commentSchema.index({ user: 1 });
 
 module.exports = mongoose.model('Comment', commentSchema);

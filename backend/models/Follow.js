@@ -6,5 +6,7 @@ const followSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 followSchema.index({ follower: 1, following: 1 }, { unique: true });
+// Covers countFollowers({ following: userId }) and getFollowers — not covered by compound prefix
+followSchema.index({ following: 1 });
 
 module.exports = mongoose.model('Follow', followSchema);

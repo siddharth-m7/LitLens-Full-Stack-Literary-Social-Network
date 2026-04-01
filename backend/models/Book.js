@@ -23,4 +23,9 @@ bookSchema.virtual('reviews', {
   foreignField: 'book'
 });
 
+// Default sort (newest first)
+bookSchema.index({ createdAt: -1 });
+// Rating-based sort and minRating filter; sparse because averageRating can be null
+bookSchema.index({ averageRating: -1 }, { sparse: true });
+
 module.exports = mongoose.model('Book', bookSchema);
