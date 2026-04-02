@@ -1,7 +1,12 @@
 const reviewRepo = require('../repositories/reviewRepository');
 const { computeBadges } = require('../utils/badgeUtils');
+const { TTL, getOrSet, LEADERBOARD_KEY } = require('../utils/cache');
 
 exports.getLeaderboard = async () => {
+  return getOrSet(LEADERBOARD_KEY, () => _fetchLeaderboard(), TTL.LEADERBOARD);
+};
+
+async function _fetchLeaderboard() {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -75,4 +80,4 @@ exports.getLeaderboard = async () => {
     month: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
     leaderboard,
   };
-};
+}

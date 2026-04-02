@@ -2,6 +2,7 @@ const logger = require('../config/logger');
 const userRepo = require('../repositories/userRepository');
 const bookRepo = require('../repositories/bookRepository');
 const reviewRepo = require('../repositories/reviewRepository');
+const { TTL, getOrSet, ANALYTICS_KEY } = require('../utils/cache');
 
 exports.getAllUsers = async () => {
   return userRepo.findAll();
@@ -37,6 +38,10 @@ exports.promoteUser = async (targetId) => {
 };
 
 exports.getAnalytics = async () => {
+  return getOrSet(ANALYTICS_KEY, _fetchAnalytics, TTL.ANALYTICS);
+};
+
+async function _fetchAnalytics() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
   thirtyDaysAgo.setHours(0, 0, 0, 0);
@@ -114,4 +119,4 @@ exports.getAnalytics = async () => {
     topBooks,
     signupsPerDay: fillDays(signupsPerDay),
   };
-};
+}

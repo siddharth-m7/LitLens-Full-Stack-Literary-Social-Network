@@ -82,7 +82,7 @@ export default function AdminDashboard() {
         setCoverUploading(true);
         try {
           const { url } = await uploadCoverUrl(rawCover);
-          setForm(prev => ({ ...prev, coverImage: url }));
+          setForm(prev => ({ ...prev, coverImage: url || prev.coverImage }));
         } catch {
           // keep the raw URL if Cloudinary upload fails
         } finally {
@@ -102,7 +102,7 @@ export default function AdminDashboard() {
     setCoverUploading(true);
     try {
       const { url } = await uploadCoverFile(file);
-      setForm(prev => ({ ...prev, coverImage: url }));
+      setForm(prev => ({ ...prev, coverImage: url || prev.coverImage }));
     } catch {
       setIsbnError('Cover upload failed. Please try again.');
     } finally {
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
         setEditCoverUploading(true);
         try {
           const { url } = await uploadCoverUrl(rawCover);
-          setEditForm(prev => ({ ...prev, coverImage: url }));
+          setEditForm(prev => ({ ...prev, coverImage: url || prev.coverImage }));
         } catch {
           // keep raw URL if upload fails
         } finally {
@@ -184,7 +184,7 @@ export default function AdminDashboard() {
     setEditCoverUploading(true);
     try {
       const { url } = await uploadCoverFile(file);
-      setEditForm(prev => ({ ...prev, coverImage: url }));
+      setEditForm(prev => ({ ...prev, coverImage: url || prev.coverImage }));
     } catch {
       setEditIsbnError('Cover upload failed. Please try again.');
     } finally {

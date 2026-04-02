@@ -1,6 +1,7 @@
 const logger = require('../config/logger');
 const reviewRepo = require('../repositories/reviewRepository');
 const bookRepo = require('../repositories/bookRepository');
+const { del, delPattern, bookDetailKey, LEADERBOARD_KEY } = require('../utils/cache');
 
 async function recalculateAverageRating(bookId) {
   const reviews = await reviewRepo.findByBook(bookId);
@@ -23,6 +24,7 @@ exports.addReview = async ({ rating, comment, tags, pros, cons, imageUrl, userId
   });
   await recalculateAverageRating(bookId);
   logger.info({ reviewId: review._id, userId, bookId }, 'Review added');
+  await Promise.all([del(bookDetailKey(bookId), LEADERBOARD_KEY), delPattern('books:list:*')]);
   return review;
 };
 
@@ -63,6 +65,7 @@ exports.updateReview = async ({ reviewId, userId, rating, comment, tags, pros, c
   await review.save();
 
   await recalculateAverageRating(review.book);
+  await Promise.all([del(bookDetailKey(review.book.toString()), LEADERBOARD_KEY), delPattern('books:list:*')]);
   return review;
 };
 
@@ -76,6 +79,7 @@ exports.deleteReview = async ({ reviewId, userId }) => {
   await review.deleteOne();
   await recalculateAverageRating(bookId);
   logger.info({ reviewId, userId, bookId }, 'Review deleted');
+  await Promise.all([del(bookDetailKey(bookId.toString()), LEADERBOARD_KEY), delPattern('books:list:*')]);
 };
 
 exports.getBookReviews = async ({ bookId, page, limit }) => {
