@@ -1,12 +1,23 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const {
   getAllBooks,
   getBookById,
   createBook,
   updateBook,
-  deleteBook
+  deleteBook,
+  uploadCover,
 } = require('../controllers/bookController');
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
 const { getBookReviews } = require('../controllers/reviewController');
 
 const authMiddleware = require('../middleware/authMiddleware');
@@ -68,6 +79,9 @@ const { validateBook, handleValidation } = require('../middleware/validators');
  *             schema:
  *               $ref: '#/components/schemas/PaginatedBooks'
  */
+// Cover image upload — must be before /:id routes
+router.post('/cover-upload', authMiddleware, adminMiddleware, upload.single('file'), uploadCover);
+
 router.get('/', getAllBooks);
 
 /**

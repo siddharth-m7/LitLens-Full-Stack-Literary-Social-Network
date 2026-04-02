@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import BookCard from '../components/BookCard';
-import { fetchBooks, createBook, updateBook, deleteBook } from '../lib/api';
+import { fetchBooks, createBook, updateBook, deleteBook, uploadCoverFile, uploadCoverUrl } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 
 const GENRES = ['Fiction', 'Non-Fiction', 'Mystery', 'Science Fiction', 'Fantasy', 'Romance', 'Thriller', 'Biography', 'Self-Help', 'Historical Fiction', 'Horror', 'Poetry', 'Other'];
@@ -14,12 +14,16 @@ export default function AdminDashboard() {
   const [form, setForm] = useState({ title: '', author: '', description: '', genre: '', coverImage: '', isbn: '' });
   const [isbnLoading, setIsbnLoading] = useState(false);
   const [isbnError, setIsbnError] = useState('');
+  const [coverUploading, setCoverUploading] = useState(false);
+  const coverFileRef = useRef(null);
 
   // Edit book state
   const [editingBook, setEditingBook] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', author: '', description: '', genre: '', coverImage: '', isbn: '' });
   const [editIsbnLoading, setEditIsbnLoading] = useState(false);
   const [editIsbnError, setEditIsbnError] = useState('');
+  const [editCoverUploading, setEditCoverUploading] = useState(false);
+  const editCoverFileRef = useRef(null);
 
   const { data: booksData, isLoading } = useQuery({
     queryKey: queryKeys.books({ limit: 1000 }),
@@ -65,17 +69,45 @@ export default function AdminDashboard() {
         setIsbnError('No book found for this ISBN. Try a different one.');
         return;
       }
+      const rawCover = data.cover?.medium || '';
       setForm(prev => ({
         ...prev,
         title: data.title || prev.title,
         author: data.authors?.[0]?.name || prev.author,
         description: (typeof data.notes === 'string' ? data.notes : data.excerpts?.[0]?.text) || prev.description,
-        coverImage: data.cover?.medium || prev.coverImage,
+        coverImage: rawCover,
       }));
+      // Auto-upload the cover to Cloudinary
+      if (rawCover) {
+        setCoverUploading(true);
+        try {
+          const { url } = await uploadCoverUrl(rawCover);
+          setForm(prev => ({ ...prev, coverImage: url }));
+        } catch {
+          // keep the raw URL if Cloudinary upload fails
+        } finally {
+          setCoverUploading(false);
+        }
+      }
     } catch (err) {
       setIsbnError('Lookup failed. Please check your connection and try again.');
     } finally {
       setIsbnLoading(false);
+    }
+  };
+
+  const handleCoverFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverUploading(true);
+    try {
+      const { url } = await uploadCoverFile(file);
+      setForm(prev => ({ ...prev, coverImage: url }));
+    } catch {
+      setIsbnError('Cover upload failed. Please try again.');
+    } finally {
+      setCoverUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -120,17 +152,44 @@ export default function AdminDashboard() {
         setEditIsbnError('No book found for this ISBN.');
         return;
       }
+      const rawCover = data.cover?.medium || '';
       setEditForm(prev => ({
         ...prev,
         title: data.title || prev.title,
         author: data.authors?.[0]?.name || prev.author,
         description: (typeof data.notes === 'string' ? data.notes : data.excerpts?.[0]?.text) || prev.description,
-        coverImage: data.cover?.medium || prev.coverImage,
+        coverImage: rawCover,
       }));
+      if (rawCover) {
+        setEditCoverUploading(true);
+        try {
+          const { url } = await uploadCoverUrl(rawCover);
+          setEditForm(prev => ({ ...prev, coverImage: url }));
+        } catch {
+          // keep raw URL if upload fails
+        } finally {
+          setEditCoverUploading(false);
+        }
+      }
     } catch {
       setEditIsbnError('Lookup failed. Please check your connection.');
     } finally {
       setEditIsbnLoading(false);
+    }
+  };
+
+  const handleEditCoverFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEditCoverUploading(true);
+    try {
+      const { url } = await uploadCoverFile(file);
+      setEditForm(prev => ({ ...prev, coverImage: url }));
+    } catch {
+      setEditIsbnError('Cover upload failed. Please try again.');
+    } finally {
+      setEditCoverUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -275,15 +334,36 @@ export default function AdminDashboard() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Cover Image URL</label>
-                  <input
-                    name="coverImage"
-                    value={form.coverImage}
-                    onChange={handleChange}
-                    placeholder="https://covers.openlibrary.org/..."
-                    className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors text-sm"
-                  />
-                  {form.coverImage && (
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Cover Image
+                    {form.coverImage?.includes('res.cloudinary.com') && (
+                      <span className="ml-2 text-xs font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Cloudinary</span>
+                    )}
+                  </label>
+                  <input type="file" accept="image/*" ref={coverFileRef} onChange={handleCoverFileChange} className="hidden" />
+                  <div className="flex gap-2">
+                    <input
+                      name="coverImage"
+                      value={form.coverImage}
+                      onChange={handleChange}
+                      placeholder="https://covers.openlibrary.org/..."
+                      className="flex-1 px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => coverFileRef.current?.click()}
+                      disabled={coverUploading}
+                      className="px-3 py-2.5 border border-[#E8E0CE] bg-white text-gray-700 rounded-lg hover:bg-[#F0EAD6] disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm whitespace-nowrap"
+                    >
+                      {coverUploading ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-600 border-t-transparent" />
+                      ) : (
+                        'Upload'
+                      )}
+                    </button>
+                  </div>
+                  {coverUploading && <p className="text-xs text-gray-500 mt-1">Uploading to Cloudinary…</p>}
+                  {form.coverImage && !coverUploading && (
                     <div className="mt-2 flex items-center gap-3">
                       <img
                         src={form.coverImage}
@@ -465,11 +545,32 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Cover Image URL</label>
-                <input name="coverImage" value={editForm.coverImage} onChange={handleEditChange}
-                  placeholder="https://..."
-                  className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors text-sm" />
-                {editForm.coverImage && (
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Cover Image
+                  {editForm.coverImage?.includes('res.cloudinary.com') && (
+                    <span className="ml-2 text-xs font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Cloudinary</span>
+                  )}
+                </label>
+                <input type="file" accept="image/*" ref={editCoverFileRef} onChange={handleEditCoverFileChange} className="hidden" />
+                <div className="flex gap-2">
+                  <input name="coverImage" value={editForm.coverImage} onChange={handleEditChange}
+                    placeholder="https://..."
+                    className="flex-1 px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors text-sm" />
+                  <button
+                    type="button"
+                    onClick={() => editCoverFileRef.current?.click()}
+                    disabled={editCoverUploading}
+                    className="px-3 py-2.5 border border-[#E8E0CE] bg-white text-gray-700 rounded-lg hover:bg-[#F0EAD6] disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm whitespace-nowrap"
+                  >
+                    {editCoverUploading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-600 border-t-transparent" />
+                    ) : (
+                      'Upload'
+                    )}
+                  </button>
+                </div>
+                {editCoverUploading && <p className="text-xs text-gray-500 mt-1">Uploading to Cloudinary…</p>}
+                {editForm.coverImage && !editCoverUploading && (
                   <div className="mt-2 flex items-center gap-3">
                     <img src={editForm.coverImage} alt="Preview"
                       className="w-10 h-14 object-cover rounded-lg border border-[#E8E0CE]"

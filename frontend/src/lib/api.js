@@ -45,6 +45,17 @@ export const updateBook = ({ id, ...data }) =>
 export const deleteBook = (id) =>
   axios.delete(`${BASE}/books/${id}`, { headers: authHeaders() }).then(r => r.data);
 
+// Upload cover image file → returns { url }
+export const uploadCoverFile = (file) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return axios.post(`${BASE}/books/cover-upload`, fd, { headers: authHeaders() }).then(r => r.data);
+};
+
+// Upload cover from a remote URL → returns { url }
+export const uploadCoverUrl = (imageUrl) =>
+  axios.post(`${BASE}/books/cover-upload`, { imageUrl }, { headers: authHeaders() }).then(r => r.data);
+
 // ─── Reviews ─────────────────────────────────────────────────────────────────
 
 export const addReview = ({ bookId, ...data }) =>
