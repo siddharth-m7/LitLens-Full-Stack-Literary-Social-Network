@@ -2,9 +2,6 @@ const REQUIRED = [
   'MONGO_URI',
   'JWT_SECRET',
   'FRONTEND_URL',
-  'SMTP_HOST',
-  'SMTP_USER',
-  'SMTP_PASS',
 ];
 
 function validateEnv() {

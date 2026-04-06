@@ -54,12 +54,3 @@ exports.validateReview = [
     .withMessage('Comment must be at most 2000 characters'),
 ];
 
-// Password reset validators
-exports.validateForgotPassword = [
-  body('email').isEmail().normalizeEmail().withMessage('A valid email is required'),
-];
-
-exports.validateResetPassword = [
-  body('token').notEmpty().withMessage('Reset token is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-];

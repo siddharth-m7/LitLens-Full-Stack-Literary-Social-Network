@@ -20,9 +20,3 @@ exports.findAll = () => User.find({}).select('-password').sort({ createdAt: -1 }
 exports.countDocuments = (filter) => User.countDocuments(filter);
 
 exports.aggregate = (pipeline) => User.aggregate(pipeline);
-
-exports.findByResetToken = (hashedToken) =>
-  User.findOne({
-    passwordResetToken: hashedToken,
-    passwordResetExpiry: { $gt: Date.now() },
-  });

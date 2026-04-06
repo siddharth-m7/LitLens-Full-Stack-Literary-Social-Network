@@ -14,8 +14,6 @@ import Analytics from './pages/Analytics';
 import BulkImport from './pages/BulkImport';
 import Home from './pages/Home'; // ✅ New import
 import AboutPage from './pages/AboutPage'; // ✅ New import
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
 import Footer from './components/Footer';
 
 function App() {
@@ -40,9 +38,6 @@ function App() {
         {/* ✅ Auth routes */}
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-
         {/* ✅ Other private routes */}
         <Route path="/books/:id" element={<BookDetails />} />
         <Route path="/profile" element={<Profile />} />

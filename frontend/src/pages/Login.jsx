@@ -125,11 +125,6 @@ export default function Login() {
                   )}
                 </button>
               </div>
-              <div className="mt-1.5 text-right">
-                <Link to="/forgot-password" className="text-xs text-gray-500 hover:text-gray-900 transition-colors">
-                  Forgot password?
-                </Link>
-              </div>
             </div>
 
             {/* Submit */}

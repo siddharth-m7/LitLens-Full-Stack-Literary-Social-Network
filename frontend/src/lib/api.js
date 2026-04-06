@@ -14,12 +14,6 @@ export const loginUser = (data) =>
 export const registerUser = (data) =>
   axios.post(`${BASE}/auth/register`, data).then(r => r.data);
 
-export const forgotPassword = (email) =>
-  axios.post(`${BASE}/auth/forgot-password`, { email }).then(r => r.data);
-
-export const resetPassword = (data) =>
-  axios.post(`${BASE}/auth/reset-password`, data).then(r => r.data);
-
 // ─── Books ────────────────────────────────────────────────────────────────────
 
 export const fetchBooks = ({ page = 1, limit = 12, search, genre, minRating, sort } = {}) => {

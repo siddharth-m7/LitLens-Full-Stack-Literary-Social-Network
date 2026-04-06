@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const adminMiddleware = require('../middleware/adminMiddleware');
 const authMiddleware = require('../middleware/authMiddleware');
-const { register, login, getProfile, refresh, logout, forgotPassword, resetPassword } = require('../controllers/authController');
+const { register, login, getProfile, refresh, logout } = require('../controllers/authController');
 const { authLimiter } = require('../middleware/rateLimiter');
-const { validateRegister, validateLogin, validateForgotPassword, validateResetPassword, handleValidation } = require('../middleware/validators');
+const { validateRegister, validateLogin, handleValidation } = require('../middleware/validators');
 
 /**
  * @swagger
@@ -157,60 +157,6 @@ router.post('/refresh', refresh);
  *         description: Unauthorized
  */
 router.post('/logout', authMiddleware, logout);
-
-/**
- * @swagger
- * /auth/forgot-password:
- *   post:
- *     summary: Request a password reset email
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email]
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: Reset email sent (always 200 to prevent email enumeration)
- *       422:
- *         description: Validation error
- */
-router.post('/forgot-password', authLimiter, validateForgotPassword, handleValidation, forgotPassword);
-
-/**
- * @swagger
- * /auth/reset-password:
- *   post:
- *     summary: Reset password using a token from the reset email
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [token, password]
- *             properties:
- *               token:
- *                 type: string
- *               password:
- *                 type: string
- *                 minLength: 6
- *     responses:
- *       200:
- *         description: Password reset successfully
- *       400:
- *         description: Invalid or expired token
- *       422:
- *         description: Validation error
- */
-router.post('/reset-password', validateResetPassword, handleValidation, resetPassword);
 
 router.get('/admin-data', authMiddleware, adminMiddleware, (req, res) => {
   res.json({ message: 'Only admins can see this' });
