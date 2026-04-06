@@ -46,7 +46,7 @@ test('Login → Create book → Add review → Delete review', async ({ page }) 
 
   // ── 4. Add a review ─────────────────────────────────────────────────────────
   // Wait for the review form to load
-  await expect(page.getByText('Share Your Thoughts')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Share Your Thoughts' })).toBeVisible();
 
   await page.locator('select[name="rating"]').selectOption('4');
   await page.getByPlaceholder(/what did you think about this book/i).fill('E2E automated review comment');
