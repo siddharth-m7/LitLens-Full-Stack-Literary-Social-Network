@@ -4,7 +4,8 @@
       "Bash(npm install:*)",
       "Bash(npx jest:*)",
       "Bash(npm i:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(npx playwright:*)"
     ]
   }
 }
