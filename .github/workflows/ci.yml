@@ -96,7 +96,7 @@ jobs:
         run: node scripts/seedE2E.js
         working-directory: backend
         env:
-          MONGO_URI: mongodb://localhost:27017/bookapp-e2e
+          MONGO_URI: mongodb://localhost:27017/litlens-e2e
 
       - name: Start backend server
         run: npm start &
@@ -104,7 +104,7 @@ jobs:
         env:
           NODE_ENV: production
           PORT: 5000
-          MONGO_URI: mongodb://localhost:27017/bookapp-e2e
+          MONGO_URI: mongodb://localhost:27017/litlens-e2e
           JWT_SECRET: ci-test-secret-do-not-use-in-prod
           FRONTEND_URL: http://localhost:5173
           REDIS_URL: ""

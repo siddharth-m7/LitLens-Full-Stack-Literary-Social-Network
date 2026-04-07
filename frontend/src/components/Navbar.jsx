@@ -33,8 +33,8 @@ export default function Navbar() {
             to="/"
             className="flex items-center space-x-2 text-xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
           >
-            <span className="text-xl">📚</span>
-            <span>BookShelf</span>
+            <img src="/img/litlens.jpeg" alt="LitLens" className="h-8 w-8 rounded-full object-cover" />
+            <span>LitLens</span>
           </Link>
 
           {/* Desktop Navigation Links */}

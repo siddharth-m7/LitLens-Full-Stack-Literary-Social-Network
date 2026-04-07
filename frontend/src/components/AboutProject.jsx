@@ -65,7 +65,7 @@ function AboutProject() {
 
         {/* Intro */}
         <p className="text-gray-600 leading-relaxed text-lg mb-12 max-w-3xl">
-          A full-stack book review platform where readers can discover books, write detailed reviews,
+          LitLens is a full-stack book discovery platform where readers can discover books, write detailed reviews,
           track their reading progress, and connect with a community of fellow book lovers.
         </p>
 
