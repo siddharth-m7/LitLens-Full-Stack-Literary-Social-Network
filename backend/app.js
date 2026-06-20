@@ -21,6 +21,8 @@ app.use(express.json());
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 app.use('/api/v1', apiLimiter, v1Routes);
 
 // 404 — no route matched
