@@ -11,7 +11,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '6px', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>📚</div>
+              <img src="/img/litlens.jpeg" alt="LitLens" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
               <div>
                 <div style={{ fontWeight: 800, fontSize: '14px', letterSpacing: '0.06em', textTransform: 'uppercase', color: '#ffffff', lineHeight: 1.1 }}>LitLens</div>
                 <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.1em', color: '#6b7280', textTransform: 'uppercase' }}>Reviews</div>
