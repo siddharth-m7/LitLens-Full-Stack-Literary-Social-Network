@@ -38,6 +38,30 @@ export const handlers = [
     HttpResponse.json({ status: null })
   ),
 
+  http.get(`${BASE}/auth/profile`, () =>
+    HttpResponse.json({ user: { _id: 'user123', name: 'Alice', email: 'alice@example.com', role: 'user' }, favorites: [], readingList: [] })
+  ),
+
+  http.get(`${BASE}/users/me`, () =>
+    HttpResponse.json({ _id: 'user123', name: 'Alice', email: 'alice@example.com', role: 'user' })
+  ),
+
+  http.get(`${BASE}/leaderboard`, () =>
+    HttpResponse.json({ leaderboard: [] })
+  ),
+
+  http.get(`${BASE}/reviews/my-reviews`, () =>
+    HttpResponse.json({ reviews: [], totalCount: 0 })
+  ),
+
+  http.get(`${BASE}/favorites`, () =>
+    HttpResponse.json([])
+  ),
+
+  http.get(`${BASE}/reading-list`, () =>
+    HttpResponse.json([])
+  ),
+
   http.post(`${BASE}/reviews/book123`, () =>
     HttpResponse.json(
       { _id: 'rev1', rating: 5, comment: 'Amazing!', user: { name: 'Alice' } },

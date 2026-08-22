@@ -241,7 +241,6 @@ export default function AboutPage() {
 
           <div
             style={{
-              backgroundColor: '#ffffff',
               border: '1px solid #e5e5e5',
               borderRadius: '8px',
               overflow: 'hidden',
