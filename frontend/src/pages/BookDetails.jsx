@@ -658,7 +658,7 @@ export default function BookDetails() {
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', padding: '24px', position: 'sticky', top: '24px' }}>
               <div style={{ borderBottom: '1px solid #e5e5e5', paddingBottom: '14px', marginBottom: '18px' }}>
                 <h3 style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0a0a0a', margin: 0 }}>
-                  {editing ? 'Update Your Review' : 'Write a Review'}
+                  {editing ? 'Update Your Review' : 'Share Your Thoughts'}
                 </h3>
                 <p style={{ fontSize: '11px', color: '#6b7280', margin: '2px 0 0' }}>
                   Share your honest rating and perspectives.
@@ -681,30 +681,23 @@ export default function BookDetails() {
                   {/* Rating Selector */}
                   <div>
                     <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', marginBottom: '6px' }}>
-                      Star Rating (1 - 5)
+                      Rating
                     </label>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setForm({ ...form, rating: star })}
-                          style={{
-                            flex: 1,
-                            padding: '8px 0',
-                            border: form.rating >= star ? '1.5px solid #d97706' : '1px solid #e5e5e5',
-                            backgroundColor: form.rating >= star ? '#fffbeb' : '#ffffff',
-                            color: form.rating >= star ? '#d97706' : '#9ca3af',
-                            borderRadius: '4px',
-                            fontWeight: 800,
-                            fontSize: '13px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          ★ {star}
-                        </button>
-                      ))}
-                    </div>
+                    <select
+                      name="rating"
+                      aria-label="Rating"
+                      value={form.rating}
+                      onChange={(e) => setForm({ ...form, rating: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '9px 12px', border: '1px solid #e5e5e5', borderRadius: '4px', fontSize: '13px', backgroundColor: '#ffffff', color: '#0a0a0a', outline: 'none' }}
+                      required
+                    >
+                      <option value="">Select a rating</option>
+                      <option value="5">5 - Excellent (⭐⭐⭐⭐⭐)</option>
+                      <option value="4">4 - Very Good (⭐⭐⭐⭐)</option>
+                      <option value="3">3 - Good (⭐⭐⭐)</option>
+                      <option value="2">2 - Fair (⭐⭐)</option>
+                      <option value="1">1 - Poor (⭐)</option>
+                    </select>
                   </div>
 
                   {/* Comment Textarea */}
@@ -716,7 +709,7 @@ export default function BookDetails() {
                       name="comment"
                       value={form.comment}
                       onChange={handleChange}
-                      placeholder="What did you love or dislike about this book?"
+                      placeholder="What did you think about this book? Share your thoughts..."
                       rows="4"
                       style={{ width: '100%', padding: '10px', border: '1px solid #e5e5e5', borderRadius: '4px', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: "'Inter', sans-serif", boxSizing: 'border-box' }}
                       required
@@ -859,7 +852,7 @@ export default function BookDetails() {
                         opacity: !form.rating || !form.comment.trim() ? 0.5 : 1,
                       }}
                     >
-                      {editing ? 'Update Review →' : 'Publish Review →'}
+                      {editing ? 'Update Review' : 'Submit Review'}
                     </button>
                     {editing && (
                       <button

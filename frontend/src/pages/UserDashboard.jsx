@@ -532,6 +532,7 @@ export default function UserDashboard() {
               {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
+                  className="animate-pulse"
                   style={{
                     backgroundColor: '#ffffff',
                     border: '1.5px solid #e5e5e5',
@@ -649,17 +650,12 @@ export default function UserDashboard() {
                                   background: coverBg,
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  justifyContent: 'space-between',
-                                  padding: '8px 6px',
-                                  boxSizing: 'border-box',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                   color: '#ffffff',
                                 }}
                               >
-                                <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>LitLens</span>
-                                <span style={{ fontSize: '14px', alignSelf: 'center' }}>📖</span>
-                                <span style={{ fontSize: '7px', fontWeight: 700, lineHeight: 1.1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                                  {book.title}
-                                </span>
+                                <span style={{ fontSize: '18px' }}>📖</span>
                               </div>
                             )}
                           </div>
