@@ -77,8 +77,8 @@ export const toggleLike = (reviewId) =>
 export const fetchComments = (reviewId, { page = 1, limit = 5 } = {}) =>
   axios.get(`${BASE}/reviews/${reviewId}/comments?page=${page}&limit=${limit}`).then(r => r.data);
 
-export const addComment = ({ reviewId, text }) =>
-  axios.post(`${BASE}/reviews/${reviewId}/comments`, { text }, { headers: authHeaders() }).then(r => r.data);
+export const addComment = ({ reviewId, text, content }) =>
+  axios.post(`${BASE}/reviews/${reviewId}/comments`, { text: text || content }, { headers: authHeaders() }).then(r => r.data);
 
 export const deleteComment = (commentId) =>
   axios.delete(`${BASE}/comments/${commentId}`, { headers: authHeaders() }).then(r => r.data);
@@ -142,8 +142,8 @@ export const fetchMyReviews = ({ page = 1, limit = 5 } = {}) =>
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
-export const fetchLeaderboard = () =>
-  axios.get(`${BASE}/leaderboard`).then(r => r.data);
+export const fetchLeaderboard = ({ period = 'all_time' } = {}) =>
+  axios.get(`${BASE}/leaderboard?period=${period}`).then(r => r.data);
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
 

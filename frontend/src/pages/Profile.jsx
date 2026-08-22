@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
+import Avatar, { genConfig } from 'react-nice-avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -23,11 +24,90 @@ const RL_LABELS = {
   finished: 'Finished',
 };
 
-const RL_COLORS = {
-  want_to_read: 'bg-[#F0EAD6] text-gray-700',
-  reading: 'bg-amber-100 text-amber-800',
-  finished: 'bg-green-100 text-green-800',
+const RL_STYLES = {
+  want_to_read: { bg: '#f3f4f6', color: '#374151', border: '#e5e5e5' },
+  reading: { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
+  finished: { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
 };
+
+const getBookCoverGradient = (title = '') => {
+  const gradients = [
+    'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+    'linear-gradient(145deg, #312e81 0%, #1e1b4b 100%)',
+    'linear-gradient(145deg, #134e4a 0%, #042f2e 100%)',
+    'linear-gradient(145deg, #701a75 0%, #4a044e 100%)',
+    'linear-gradient(145deg, #7c2d12 0%, #451a03 100%)',
+    'linear-gradient(145deg, #1e3a8a 0%, #172554 100%)',
+  ];
+  const charCodeSum = (title || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return gradients[charCodeSum % gradients.length];
+};
+
+function BookCoverThumb({ src, title = '', width = '36px', height = '50px' }) {
+  const gradient = getBookCoverGradient(title);
+
+  if (!src) {
+    return (
+      <div
+        style={{
+          width,
+          height,
+          background: gradient,
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#ffffff',
+          flexShrink: 0,
+          boxShadow: '1px 2px 6px rgba(0,0,0,0.12)',
+          border: '1px solid rgba(0,0,0,0.08)',
+        }}
+      >
+        <span style={{ fontSize: '13px' }}>📖</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'relative', width, height, flexShrink: 0 }}>
+      <img
+        src={src}
+        alt={title}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          borderRadius: '4px',
+          border: '1px solid #e5e5e5',
+          boxShadow: '1px 2px 6px rgba(0,0,0,0.08)',
+          display: 'block',
+        }}
+        onError={(e) => {
+          e.currentTarget.style.display = 'none';
+          if (e.currentTarget.nextElementSibling) {
+            e.currentTarget.nextElementSibling.style.display = 'flex';
+          }
+        }}
+      />
+      <div
+        style={{
+          display: 'none',
+          width: '100%',
+          height: '100%',
+          background: gradient,
+          borderRadius: '4px',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#ffffff',
+          boxShadow: '1px 2px 6px rgba(0,0,0,0.12)',
+          border: '1px solid rgba(0,0,0,0.08)',
+        }}
+      >
+        <span style={{ fontSize: '13px' }}>📖</span>
+      </div>
+    </div>
+  );
+}
 
 async function fetchFullProfile() {
   const [profileData, favorites, readingList] = await Promise.all([
@@ -67,6 +147,7 @@ export default function Profile() {
     reviewCount: profileReviewCount = 0,
     favorites = [],
     readingList = [],
+    createdAt: userCreatedAt,
   } = profileData ?? {};
 
   const { data: reviewsData } = useQuery({
@@ -146,225 +227,331 @@ export default function Profile() {
     );
   };
 
+  const memberYear = userCreatedAt ? new Date(userCreatedAt).getFullYear() : '2025';
+  const avatarConfig = genConfig(profileUserName || 'profile-user');
+
   return (
-    <div className="min-h-screen bg-[#FAF6EE]">
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div style={{ backgroundColor: '#f8f8f8', minHeight: '100vh', fontFamily: "'Inter', sans-serif" }}>
 
-        {/* Profile Header */}
-        <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm mb-8">
-          <div className="p-6 sm:p-8">
+      {/* ── HEADER BANNER ────────────────────────────────────────── */}
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          backgroundImage:
+            'linear-gradient(#e5e5e5 1px, transparent 1px), linear-gradient(90deg, #e5e5e5 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+          borderBottom: '1px solid #e5e5e5',
+          padding: '48px 0 36px',
+        }}
+      >
+        <div style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '20px' }}>
 
-            {/* Top row: avatar + info */}
-            <div className="flex items-center gap-5">
-
-              {/* Avatar */}
-              <div className="relative shrink-0">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#A89070] to-[#6B5440] flex items-center justify-center shadow-md">
-                  <span className="text-3xl font-bold text-white select-none">
-                    {profileUser?.name?.charAt(0)?.toUpperCase() || '?'}
-                  </span>
-                </div>
-                {/* Online dot */}
-                <span className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-green-400 border-2 border-white rounded-full" />
+            {/* Avatar & User Details */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div style={{ width: '72px', height: '72px', borderRadius: '50%', overflow: 'hidden', border: '2px solid #0a0a0a', boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }}>
+                <Avatar style={{ width: '100%', height: '100%' }} {...avatarConfig} />
               </div>
 
-              {/* Name / email / role */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="text-xl font-bold text-gray-900 truncate">{profileUser?.name}</h1>
-                  <span className="inline-flex items-center gap-1 bg-[#F0EAD6] border border-[#DDD3B8] text-[#8B7355] text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#8B7355]" />
-                    {profileUser?.role}
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                  <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#0a0a0a', letterSpacing: '-0.02em' }}>
+                    {profileUser?.name || 'Reader Profile'}
+                  </h1>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: profileUser?.role === 'admin' ? '#fef2f2' : '#f0fdf4',
+                      color: profileUser?.role === 'admin' ? '#b91c1c' : '#15803d',
+                      border: `1px solid ${profileUser?.role === 'admin' ? '#fecaca' : '#bbf7d0'}`,
+                    }}
+                  >
+                    {profileUser?.role === 'admin' ? '🛡️ Admin' : '📖 Reader'}
                   </span>
                 </div>
-                <p className="flex items-center gap-1.5 text-gray-400 text-sm mt-1 truncate">
-                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  {profileUser?.email}
+
+                <p style={{ fontSize: '13px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{profileUser?.email}</span>
+                  <span>•</span>
+                  <span>Member since {memberYear}</span>
                 </p>
               </div>
             </div>
 
-            {/* Stats row */}
-            {profileUser?.role === 'user' && (
-              <div className="mt-6 pt-5 border-t border-[#E8E0CE] grid grid-cols-3 divide-x divide-[#E8E0CE]">
-                {[
-                  { label: 'Followers', value: followerCount, onClick: () => setFollowModal('followers'), clickable: true },
-                  { label: 'Following', value: followingCount, onClick: () => setFollowModal('following'), clickable: true },
-                  { label: 'Reviews',   value: profileReviewCount, clickable: false },
-                ].map(({ label, value, onClick, clickable }) => (
-                  clickable ? (
-                    <button key={label} onClick={onClick} className="group flex flex-col items-center gap-0.5 py-1 hover:bg-[#FAF6EE] rounded-lg transition-colors">
-                      <span className="text-2xl font-bold text-gray-900">{value}</span>
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
-                        {label}
-                        <svg className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </span>
-                    </button>
-                  ) : (
-                    <div key={label} className="flex flex-col items-center gap-0.5 py-1">
-                      <span className="text-2xl font-bold text-gray-900">{value}</span>
-                      <span className="text-xs text-gray-400">{label}</span>
-                    </div>
-                  )
-                ))}
-              </div>
-            )}
+            {/* Quick Actions */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Link
+                to="/dashboard"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: '#0a0a0a',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  padding: '9px 16px',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                }}
+              >
+                Dashboard →
+              </Link>
+            </div>
           </div>
+
+          {/* Followers / Reviews Stats Row */}
+          {profileUser?.role === 'user' && (
+            <div
+              style={{
+                marginTop: '28px',
+                paddingTop: '20px',
+                borderTop: '1px solid #e5e5e5',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '12px',
+              }}
+            >
+              <button
+                onClick={() => setFollowModal('followers')}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                }}
+              >
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#0a0a0a', display: 'block' }}>
+                  {followerCount}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Followers →
+                </span>
+              </button>
+
+              <button
+                onClick={() => setFollowModal('following')}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  padding: '4px 0',
+                }}
+              >
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#0a0a0a', display: 'block' }}>
+                  {followingCount}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Following →
+                </span>
+              </button>
+
+              <div>
+                <span style={{ fontSize: '20px', fontWeight: 900, color: '#0a0a0a', display: 'block' }}>
+                  {profileReviewCount}
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Reviews Authored
+                </span>
+              </div>
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* ── MAIN CONTENT BODY ────────────────────────────────────── */}
+      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '36px 1.5rem 80px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
         {profileUser?.role === 'admin' ? (
-          /* Admin Section */
-          <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 sm:px-8 py-6 border-b border-[#E8E0CE]">
-              <h2 className="text-xl font-semibold text-gray-900">Admin Access</h2>
-              <p className="text-gray-500 mt-1 text-sm">You have administrator privileges.</p>
+          /* Admin Access Box */
+          <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', padding: '28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h2 style={{ fontSize: '16px', fontWeight: 800, color: '#0a0a0a', marginBottom: '4px' }}>Platform Administrator</h2>
+              <p style={{ fontSize: '13px', color: '#6b7280' }}>You have elevated permissions to curate books, moderate reviews, and view system metrics.</p>
             </div>
-            <div className="p-6 sm:p-8">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-4 sm:space-y-0">
-                <p className="text-gray-700 text-base leading-relaxed">
-                  Use the dashboard to manage books and content.
-                </p>
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
-                >
-                  Go to Admin Dashboard
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={() => navigate('/admin')}
+              style={{ padding: '10px 20px', backgroundColor: '#0a0a0a', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+            >
+              Open Admin Center →
+            </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <>
+            {/* ── ACHIEVEMENTS & MILESTONES ───────────────────────── */}
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', padding: '28px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <div>
+                  <h2 style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0a0a0a' }}>
+                    Badges &amp; Milestones
+                  </h2>
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                    Badges earned through consistent reading and community engagement.
+                  </p>
+                </div>
+              </div>
 
-          {/* Achievements Section */}
-          <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 sm:px-8 py-5 border-b border-[#E8E0CE]">
-              <h2 className="text-xl font-semibold text-gray-900">Achievements</h2>
-              <p className="text-gray-500 text-sm mt-0.5">Badges earned and milestones reached</p>
-            </div>
-            <div className="p-6 sm:p-8 space-y-6">
-              {/* Badges */}
-              <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Badges</h3>
+              {/* Badges row */}
+              <div style={{ marginBottom: '24px' }}>
+                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px' }}>
+                  Earned Badges
+                </p>
                 {badges.length === 0 ? (
-                  <p className="text-gray-400 text-sm italic">No badges yet — write more reviews to earn them!</p>
+                  <p style={{ fontSize: '13px', color: '#9ca3af', fontStyle: 'italic' }}>
+                    No badges earned yet. Write reviews to unlock your first badge!
+                  </p>
                 ) : (
-                  <div className="flex flex-wrap gap-3">
-                    {badges.map(b => (
-                      <div key={b.id} className="flex items-center gap-2 bg-[#F0EAD6] border border-[#E8E0CE] rounded-xl px-4 py-2.5">
-                        <span className="text-xl">{b.emoji}</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {badges.map((b) => (
+                      <div
+                        key={b.id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          backgroundColor: '#f8f8f8',
+                          border: '1px solid #e5e5e5',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                        }}
+                      >
+                        <span style={{ fontSize: '18px' }}>{b.emoji}</span>
                         <div>
-                          <p className="font-semibold text-gray-900 text-sm">{b.label}</p>
-                          <p className="text-gray-500 text-xs">{b.desc}</p>
+                          <p style={{ fontSize: '12px', fontWeight: 700, color: '#0a0a0a', margin: 0 }}>{b.label}</p>
+                          <p style={{ fontSize: '10px', color: '#6b7280', margin: 0 }}>{b.desc}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-              {/* Milestones */}
+
+              {/* Milestones grid */}
               <div>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Milestones</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {milestones.map(m => (
+                <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: '10px' }}>
+                  Review Milestones
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }} className="milestone-grid">
+                  {milestones.map((m) => (
                     <div
                       key={m.count}
-                      className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center ${
-                        m.unlocked
-                          ? 'bg-[#F0EAD6] border-[#E8E0CE] text-gray-700'
-                          : 'bg-white border-[#E8E0CE] text-gray-400'
-                      }`}
+                      style={{
+                        backgroundColor: m.unlocked ? '#ffffff' : '#fafafa',
+                        border: m.unlocked ? '1.5px solid #0a0a0a' : '1px solid #e5e5e5',
+                        borderRadius: '6px',
+                        padding: '14px 10px',
+                        textAlign: 'center',
+                        opacity: m.unlocked ? 1 : 0.6,
+                      }}
                     >
-                      <span className="text-2xl">{m.unlocked ? m.emoji : '🔒'}</span>
-                      <p className="text-xs font-semibold">{m.label}</p>
-                      <p className="text-xs">{m.count} review{m.count !== 1 ? 's' : ''}</p>
+                      <span style={{ fontSize: '20px', display: 'block', marginBottom: '4px' }}>
+                        {m.unlocked ? m.emoji : '🔒'}
+                      </span>
+                      <p style={{ fontSize: '11px', fontWeight: 700, color: '#0a0a0a', marginBottom: '2px' }}>{m.label}</p>
+                      <p style={{ fontSize: '10px', color: '#6b7280' }}>{m.count} {m.count === 1 ? 'review' : 'reviews'}</p>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* User Reviews Section */}
-          <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 sm:px-8 py-5 border-b border-[#E8E0CE] flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Your Reviews</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Manage and edit your book reviews</p>
-              </div>
-              <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                {reviewsData?.totalCount ?? profileReviewCount}
-              </span>
-            </div>
-
-            <div className="p-6 sm:p-8">
-              {reviews.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-5xl mb-4">📚</div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Reviews Yet</h3>
-                  <p className="text-gray-500 text-sm max-w-md mx-auto">
-                    You haven't posted any reviews yet. Start exploring books and share your thoughts!
+            {/* ── MY REVIEWS SECTION ─────────────────────────────── */}
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', overflow: 'hidden' }}>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ fontSize: '14px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0a0a0a' }}>
+                    My Book Reviews
+                  </h2>
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                    Manage and edit the reviews you have posted.
                   </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {reviews.map((review) => (
-                    <div key={review._id} className="bg-white border border-[#E8E0CE] rounded-xl overflow-hidden hover:shadow-md transition-shadow">
-                      {editingReviewId === review._id ? (
-                        /* Edit Form */
-                        <div className="p-6">
-                          <p className="text-sm font-medium text-gray-700 mb-4">
-                            Editing review for "{review.book?.title || 'Untitled Book'}"
-                          </p>
-                          <form onSubmit={handleUpdate} className="space-y-4">
+                <span style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#f3f3f3', color: '#374151', padding: '3px 9px', borderRadius: '4px' }}>
+                  {reviewsData?.totalCount ?? profileReviewCount} Total
+                </span>
+              </div>
+
+              <div style={{ padding: '24px' }}>
+                {reviews.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '36px 0' }}>
+                    <div style={{ fontSize: '32px', marginBottom: '10px' }}>✍️</div>
+                    <p style={{ fontSize: '14px', fontWeight: 700, color: '#0a0a0a', marginBottom: '4px' }}>No Reviews Written Yet</p>
+                    <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '18px' }}>Explore books in the library and share your ratings.</p>
+                    <Link
+                      to="/dashboard"
+                      style={{ display: 'inline-flex', padding: '8px 16px', backgroundColor: '#0a0a0a', color: '#ffffff', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '4px', textDecoration: 'none' }}
+                    >
+                      Browse Books →
+                    </Link>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {reviews.map((review) => (
+                      <div
+                        key={review._id}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #e5e5e5',
+                          borderRadius: '6px',
+                          padding: '20px',
+                          transition: 'border-color 0.15s ease',
+                        }}
+                      >
+                        {editingReviewId === review._id ? (
+                          /* Edit Review Form */
+                          <form onSubmit={handleUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: '#0a0a0a' }}>
+                              Editing review for "{review.book?.title || 'Untitled Book'}"
+                            </p>
+
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                              <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', marginBottom: '4px' }}>
                                 Rating
                               </label>
                               <select
                                 name="rating"
                                 value={form.rating}
-                                onChange={(e) =>
-                                  setForm({ ...form, rating: e.target.value })
-                                }
-                                className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
+                                onChange={(e) => setForm({ ...form, rating: e.target.value })}
+                                style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e5e5', borderRadius: '4px', fontSize: '13px', outline: 'none' }}
                                 required
                               >
                                 <option value="">Select a rating</option>
-                                <option value="1">1 - Poor</option>
-                                <option value="2">2 - Fair</option>
-                                <option value="3">3 - Good</option>
-                                <option value="4">4 - Very Good</option>
-                                <option value="5">5 - Excellent</option>
+                                <option value="5">⭐⭐⭐⭐⭐ (5/5) - Excellent</option>
+                                <option value="4">⭐⭐⭐⭐ (4/5) - Very Good</option>
+                                <option value="3">⭐⭐⭐ (3/5) - Good</option>
+                                <option value="2">⭐⭐ (2/5) - Fair</option>
+                                <option value="1">⭐ (1/5) - Poor</option>
                               </select>
                             </div>
 
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                                Comment
+                              <label style={{ display: 'block', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', marginBottom: '4px' }}>
+                                Review Text
                               </label>
                               <textarea
                                 name="comment"
                                 value={form.comment}
-                                onChange={(e) =>
-                                  setForm({ ...form, comment: e.target.value })
-                                }
-                                rows="4"
-                                className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors resize-none"
-                                placeholder="Share your thoughts about this book..."
+                                onChange={(e) => setForm({ ...form, comment: e.target.value })}
+                                rows="3"
+                                style={{ width: '100%', padding: '8px 12px', border: '1px solid #e5e5e5', borderRadius: '4px', fontSize: '13px', outline: 'none', resize: 'vertical' }}
                                 required
                               />
                             </div>
 
-                            <div className="flex flex-col sm:flex-row gap-3">
+                            <div style={{ display: 'flex', gap: '8px' }}>
                               <button
                                 type="submit"
                                 disabled={updateReviewMutation.isPending}
-                                className="flex-1 bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ padding: '8px 16px', backgroundColor: '#0a0a0a', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
                               >
                                 {updateReviewMutation.isPending ? 'Saving...' : 'Update Review'}
                               </button>
@@ -374,370 +561,353 @@ export default function Profile() {
                                   setEditingReviewId(null);
                                   setForm({ rating: '', comment: '' });
                                 }}
-                                className="border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
+                                style={{ padding: '8px 16px', backgroundColor: 'transparent', color: '#0a0a0a', border: '1px solid #e5e5e5', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
                               >
                                 Cancel
                               </button>
                             </div>
                           </form>
-                        </div>
-                      ) : (
-                        /* Review Display */
-                        <div className="p-6">
-                          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-                            <div className="flex-1">
-                              <h3 className="text-base font-semibold text-gray-900 mb-2">
+                        ) : (
+                          /* Review View Mode */
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+                            <div style={{ flex: 1, minWidth: '240px' }}>
+                              <Link
+                                to={`/books/${review.book?._id}`}
+                                style={{ fontSize: '14px', fontWeight: 800, color: '#0a0a0a', textDecoration: 'none', marginBottom: '4px', display: 'inline-block' }}
+                              >
                                 {review.book?.title || 'Untitled Book'}
-                              </h3>
+                              </Link>
 
-                              <div className="flex items-center space-x-2 mb-3">
-                                <div className="flex">
-                                  {[...Array(5)].map((_, i) => (
-                                    <span key={i} className={`text-base ${i < review.rating ? 'text-amber-400' : 'text-amber-300 opacity-40'}`}>
-                                      ★
-                                    </span>
-                                  ))}
-                                </div>
-                                <span className="text-sm font-semibold text-gray-700">
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '4px 0 8px' }}>
+                                <span style={{ color: '#d97706', fontSize: '13px' }}>
+                                  {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                                </span>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: '#0a0a0a' }}>
                                   {review.rating}/5
                                 </span>
                               </div>
 
-                              <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                              <p style={{ fontSize: '13px', color: '#374151', lineHeight: 1.6, marginBottom: '8px' }}>
                                 {review.comment}
                               </p>
 
-                              {/* Tags */}
-                              {review.tags?.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5 mb-3">
-                                  {review.tags.map(tag => (
-                                    <span key={tag} className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">{tag}</span>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Pros */}
-                              {review.pros?.length > 0 && (
-                                <div className="mb-2">
-                                  <p className="text-xs font-semibold text-gray-600 mb-1">Pros</p>
-                                  <ul className="space-y-0.5">
-                                    {review.pros.map((pro, i) => (
-                                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
-                                        <span className="mt-0.5 flex-shrink-0 text-green-600">✓</span>{pro}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Cons */}
-                              {review.cons?.length > 0 && (
-                                <div className="mb-2">
-                                  <p className="text-xs font-semibold text-gray-600 mb-1">Cons</p>
-                                  <ul className="space-y-0.5">
-                                    {review.cons.map((con, i) => (
-                                      <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
-                                        <span className="mt-0.5 flex-shrink-0 text-red-500">✗</span>{con}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {/* Review image */}
                               {review.imageUrl && (
                                 <img
                                   src={review.imageUrl}
-                                  alt="Review"
-                                  className="mt-2 mb-3 rounded-lg max-h-40 object-cover border border-[#E8E0CE]"
-                                  onError={e => { e.target.style.display = 'none'; }}
+                                  alt="Review attachment"
+                                  style={{ maxHeight: '120px', borderRadius: '4px', border: '1px solid #e5e5e5', marginBottom: '8px', objectFit: 'cover' }}
+                                  onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                               )}
 
-                              <p className="text-xs text-gray-400 mt-2">
+                              <span style={{ fontSize: '11px', color: '#9ca3af' }}>
                                 Posted on {new Date(review.createdAt).toLocaleDateString()}
-                              </p>
+                              </span>
                             </div>
 
-                            <div className="flex sm:flex-col space-x-2 sm:space-x-0 sm:space-y-2">
+                            {/* Action buttons */}
+                            <div style={{ display: 'flex', gap: '6px' }}>
                               <button
                                 onClick={() => handleEdit(review)}
-                                className="flex-1 sm:flex-none border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-lg font-medium text-sm text-center hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
+                                style={{ padding: '6px 12px', backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '4px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', color: '#0a0a0a' }}
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDelete(review._id)}
                                 disabled={deleteReviewMutation.isPending}
-                                className="flex-1 sm:flex-none border border-red-200 bg-red-50 text-red-600 px-3 py-2 rounded-lg font-medium text-sm text-center hover:bg-red-100 hover:border-red-300 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ padding: '6px 12px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer', color: '#b91c1c' }}
                               >
                                 Delete
                               </button>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(reviewsData?.totalPages || 0) > 1 && (
+                  <div style={{ marginTop: '20px' }}>
+                    <Pagination
+                      page={reviewPage}
+                      totalPages={reviewsData.totalPages}
+                      onPrev={() => setReviewPage((p) => p - 1)}
+                      onNext={() => setReviewPage((p) => p + 1)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ── FAVORITES & READING LIST (2 COLUMNS) ────────────── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }} className="profile-shelves-grid">
+
+              {/* Favorites Shelf */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0a0a0a' }}>
+                    ❤️ My Favorites
+                  </h3>
+                  <span style={{ fontSize: '10px', fontWeight: 700, backgroundColor: '#f3f3f3', padding: '2px 8px', borderRadius: '4px' }}>
+                    {favorites.filter(({ book }) => book != null).length}
+                  </span>
+                </div>
+
+                <div style={{ padding: '20px' }}>
+                  {favorites.filter(({ book }) => book != null).length === 0 ? (
+                    <p style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
+                      No favorites added yet. Heart a book on its detail page!
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {favorites.filter(({ book }) => book != null).map(({ _id, book }) => (
+                        <Link
+                          key={_id}
+                          to={`/books/${book._id}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '10px',
+                            border: '1px solid #e5e5e5',
+                            borderRadius: '6px',
+                            textDecoration: 'none',
+                            transition: 'border-color 0.15s ease',
+                            backgroundColor: '#ffffff',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#0a0a0a')}
+                          onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#e5e5e5')}
+                        >
+                          <BookCoverThumb src={book.coverImage} title={book.title} width="34px" height="48px" />
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ fontSize: '13px', fontWeight: 700, color: '#0a0a0a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</p>
+                            <p style={{ fontSize: '11px', color: '#6b7280', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>by {book.author}</p>
+                          </div>
+                        </Link>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-              {(reviewsData?.totalPages || 0) > 1 && (
-                <div className="mt-4">
-                  <Pagination
-                    page={reviewPage}
-                    totalPages={reviewsData.totalPages}
-                    onPrev={() => setReviewPage(p => p - 1)}
-                    onNext={() => setReviewPage(p => p + 1)}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Favorites Section */}
-          <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 sm:px-8 py-5 border-b border-[#E8E0CE] flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">My Favorites</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Books you've marked as favorites</p>
               </div>
-              <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                {favorites.filter(({ book }) => book != null).length}
-              </span>
-            </div>
-            <div className="p-6 sm:p-8">
-              {favorites.filter(({ book }) => book != null).length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-3">🤍</div>
-                  <p className="text-gray-500 font-medium text-sm">No favorites yet</p>
-                  <p className="text-gray-400 text-xs mt-1">Heart a book on its detail page to add it here</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {favorites.filter(({ book }) => book != null).map(({ _id, book }) => (
-                    <Link
-                      key={_id}
-                      to={`/books/${book._id}`}
-                      className="flex items-center gap-4 p-4 rounded-xl border border-[#E8E0CE] hover:shadow-md transition-shadow group"
-                    >
-                      {book.coverImage ? (
-                        <img src={book.coverImage} alt={book.title} className="w-10 h-14 object-cover rounded-lg flex-shrink-0" onError={(e) => { e.target.style.display='none'; }} />
-                      ) : (
-                        <div className="w-10 h-14 bg-[#F0EAD6] rounded-lg flex items-center justify-center flex-shrink-0">
-                          <span className="text-gray-500 text-lg">📖</span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 truncate text-sm">{book.title}</p>
-                        <p className="text-xs text-gray-500 truncate">by {book.author}</p>
-                        {book.genre && <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md mt-1 inline-block">{book.genre}</span>}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
 
-          {/* Reading List Section */}
-          <div className="bg-white border border-[#E8E0CE] rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 sm:px-8 py-5 border-b border-[#E8E0CE] flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">My Reading List</h2>
-                <p className="text-gray-500 text-sm mt-0.5">Track your reading progress</p>
-              </div>
-              <span className="bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                {readingList.filter(({ book }) => book != null).length}
-              </span>
-            </div>
-            <div className="p-6 sm:p-8">
-              {readingList.filter(({ book }) => book != null).length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-3">📚</div>
-                  <p className="text-gray-500 font-medium text-sm">Your reading list is empty</p>
-                  <p className="text-gray-400 text-xs mt-1">Add books from their detail page</p>
+              {/* Reading List Shelf */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e5e5e5', borderRadius: '8px', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#0a0a0a' }}>
+                    📚 Reading Shelves
+                  </h3>
+                  <span style={{ fontSize: '10px', fontWeight: 700, backgroundColor: '#f3f3f3', padding: '2px 8px', borderRadius: '4px' }}>
+                    {readingList.filter(({ book }) => book != null).length}
+                  </span>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {['want_to_read', 'reading', 'finished'].map((status) => {
-                    const items = readingList.filter(e => e.status === status);
-                    if (items.length === 0) return null;
-                    return (
-                      <div key={status}>
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md mb-3 ${RL_COLORS[status]}`}>
-                          {RL_LABELS[status]} ({items.length})
-                        </span>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {items.filter(({ book }) => book != null).map(({ _id, book }) => (
-                            <Link
-                              key={_id}
-                              to={`/books/${book._id}`}
-                              className="flex items-center gap-4 p-4 rounded-xl border border-[#E8E0CE] hover:shadow-md transition-shadow group"
+
+                <div style={{ padding: '20px' }}>
+                  {readingList.filter(({ book }) => book != null).length === 0 ? (
+                    <p style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic', textAlign: 'center', padding: '20px 0' }}>
+                      Reading list is empty. Add books from any book page!
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {['want_to_read', 'reading', 'finished'].map((status) => {
+                        const items = readingList.filter((e) => e.status === status && e.book != null);
+                        if (items.length === 0) return null;
+                        const statusStyle = RL_STYLES[status];
+
+                        return (
+                          <div key={status}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                letterSpacing: '0.06em',
+                                textTransform: 'uppercase',
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                backgroundColor: statusStyle.bg,
+                                color: statusStyle.color,
+                                border: `1px solid ${statusStyle.border}`,
+                                marginBottom: '8px',
+                              }}
                             >
-                              {book.coverImage ? (
-                                <img src={book.coverImage} alt={book.title} className="w-10 h-14 object-cover rounded-lg flex-shrink-0" onError={(e) => { e.target.style.display='none'; }} />
-                              ) : (
-                                <div className="w-10 h-14 bg-[#F0EAD6] rounded-lg flex items-center justify-center flex-shrink-0">
-                                  <span className="text-gray-500 text-lg">📖</span>
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-900 truncate text-sm">{book.title}</p>
-                                <p className="text-xs text-gray-500 truncate">by {book.author}</p>
-                              </div>
-                            </Link>
-                          ))}
+                              {RL_LABELS[status]} ({items.length})
+                            </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {items.map(({ _id, book }) => (
+                                <Link
+                                  key={_id}
+                                  to={`/books/${book._id}`}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    padding: '8px 10px',
+                                    border: '1px solid #f0f0f0',
+                                    borderRadius: '4px',
+                                    textDecoration: 'none',
+                                    backgroundColor: '#fafafa',
+                                  }}
+                                >
+                                  <BookCoverThumb src={book.coverImage} title={book.title} width="30px" height="42px" />
+                                  <div style={{ minWidth: 0 }}>
+                                    <p style={{ fontSize: '12px', fontWeight: 700, color: '#0a0a0a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{book.title}</p>
+                                    <p style={{ fontSize: '10px', color: '#6b7280', margin: '1px 0 0' }}>by {book.author}</p>
+                                  </div>
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── DANGER ZONE (ACCOUNT SETTINGS) ─────────────────── */}
+            <div style={{ backgroundColor: '#ffffff', border: '1px solid #fee2e2', borderRadius: '8px', padding: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 800, color: '#b91c1c', marginBottom: '2px' }}>Danger Zone</p>
+                <p style={{ fontSize: '12px', color: '#6b7280' }}>Permanently delete your account, reviews, and reading lists.</p>
+              </div>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                style={{ padding: '8px 16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#b91c1c', cursor: 'pointer' }}
+              >
+                Delete Account
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── FOLLOWERS / FOLLOWING MODAL ──────────────────────────── */}
+      {followModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 50, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setFollowModal(null)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: '440px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e5e5e5', overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e5e5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#0a0a0a' }}>
+                {followModal === 'followers' ? 'Followers' : 'Following'}
+              </h3>
+              <button onClick={() => setFollowModal(null)} style={{ background: 'none', border: 'none', fontSize: '16px', color: '#9ca3af', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ maxHeight: '340px', overflowY: 'auto', padding: '16px' }}>
+              {(followModal === 'followers' ? loadingFollowers : loadingFollowing) ? (
+                <p style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', padding: '20px 0' }}>Loading...</p>
+              ) : (followModal === 'followers' ? followersList : followingList).length === 0 ? (
+                <p style={{ textAlign: 'center', fontSize: '12px', color: '#9ca3af', padding: '20px 0' }}>No {followModal} found.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(followModal === 'followers' ? followersList : followingList).map((item) => {
+                    const targetUser = (followModal === 'followers' ? item?.follower : item?.following) || item;
+                    if (!targetUser) return null;
+                    const targetId = targetUser._id || item._id;
+                    const targetName = targetUser.name || 'Reader';
+                    const targetEmail = targetUser.email || '';
+
+                    return (
+                      <Link
+                        key={targetId}
+                        to={`/users/${targetId}`}
+                        onClick={() => setFollowModal(null)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 12px',
+                          borderRadius: '6px',
+                          textDecoration: 'none',
+                          border: '1px solid #e5e5e5',
+                          backgroundColor: '#ffffff',
+                          transition: 'border-color 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#0a0a0a')}
+                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#e5e5e5')}
+                      >
+                        <div style={{ width: '36px', height: '36px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '1px solid #e5e5e5' }}>
+                          <Avatar style={{ width: '100%', height: '100%' }} {...genConfig(targetName)} />
                         </div>
-                      </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '13px', fontWeight: 800, color: '#0a0a0a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {targetName}
+                          </p>
+                          {targetEmail ? (
+                            <p style={{ fontSize: '11px', color: '#6b7280', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {targetEmail}
+                            </p>
+                          ) : (
+                            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#15803d', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '3px', display: 'inline-block', marginTop: '2px' }}>
+                              Reader
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#0a0a0a' }}>
+                          View →
+                        </span>
+                      </Link>
                     );
                   })}
                 </div>
               )}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Danger Zone */}
-          <div className="bg-white border border-red-100 rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 sm:px-8 py-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Delete Account</h2>
-                <p className="text-gray-400 text-sm mt-0.5">
-                  Permanently removes your account, reviews, favorites, and all follow relationships.
-                </p>
-              </div>
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="shrink-0 ml-6 border border-red-200 text-red-500 text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-50 hover:border-red-300 active:scale-[0.98] transition-all duration-150"
-              >
-                Delete account
-              </button>
-            </div>
-          </div>
-
-          </div>
-        )}
-      </div>
-
-      {/* Delete Account Confirmation Modal */}
+      {/* ── DELETE ACCOUNT MODAL ─────────────────────────────────── */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowDeleteModal(false)}>
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 50, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setShowDeleteModal(false)}
+        >
           <div
-            className="relative bg-white border border-[#E8E0CE] rounded-2xl shadow-xl w-full max-w-sm p-6"
-            onClick={e => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: '400px', backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e5e5e5', padding: '24px', textAlign: 'center' }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-center w-12 h-12 bg-red-50 rounded-full mx-auto mb-4">
-              <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              </svg>
-            </div>
-            <h2 className="text-base font-semibold text-gray-900 text-center mb-1">Delete your account?</h2>
-            <p className="text-sm text-gray-500 text-center mb-6">
-              This will permanently delete your account, all your reviews, favorites, and reading list. Your followers and following relationships will also be removed. This cannot be undone.
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>⚠️</div>
+            <h3 style={{ fontSize: '16px', fontWeight: 900, color: '#b91c1c', marginBottom: '6px' }}>Delete Account?</h3>
+            <p style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.6, marginBottom: '20px' }}>
+              This action is permanent and cannot be undone. All your written reviews, comments, and shelves will be wiped.
             </p>
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 border-2 border-gray-900 text-gray-900 px-4 py-2.5 rounded-xl font-medium hover:bg-gray-900 hover:text-white transition-all duration-150"
+                style={{ padding: '9px 18px', backgroundColor: '#f3f3f3', color: '#0a0a0a', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 Cancel
               </button>
               <button
-                onClick={() => { setShowDeleteModal(false); deleteAccountMutation.mutate(); }}
+                onClick={() => deleteAccountMutation.mutate()}
                 disabled={deleteAccountMutation.isPending}
-                className="flex-1 bg-red-500 text-white px-4 py-2.5 rounded-xl font-medium hover:bg-red-600 active:scale-[0.98] transition-all duration-150 disabled:opacity-50"
+                style={{ padding: '9px 18px', backgroundColor: '#b91c1c', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
-                {deleteAccountMutation.isPending ? 'Deleting...' : 'Yes, delete'}
+                {deleteAccountMutation.isPending ? 'Deleting...' : 'Yes, Delete'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Followers / Following Modal */}
-      {followModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setFollowModal(null)}
-        >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-
-          {/* Panel */}
-          <div
-            className="relative bg-white border border-[#E8E0CE] rounded-2xl shadow-xl w-full max-w-sm max-h-[70vh] flex flex-col overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8E0CE]">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900 capitalize">{followModal}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {followModal === 'followers' ? `${followerCount} follower${followerCount !== 1 ? 's' : ''}` : `${followingCount} following`}
-                </p>
-              </div>
-              <button
-                onClick={() => setFollowModal(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-[#F0EAD6] transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* List */}
-            <div className="overflow-y-auto flex-1 px-4 py-3">
-              {(followModal === 'followers' ? loadingFollowers : loadingFollowing) ? (
-                <div className="flex justify-center py-10">
-                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-900 border-t-transparent" />
-                </div>
-              ) : (() => {
-                const list = followModal === 'followers' ? followersList : followingList;
-                const people = list.map(item =>
-                  followModal === 'followers' ? item.follower : item.following
-                ).filter(Boolean);
-
-                if (people.length === 0) {
-                  return (
-                    <div className="text-center py-10">
-                      <p className="text-gray-400 text-sm">
-                        {followModal === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="space-y-1">
-                    {people.map(person => (
-                      <Link
-                        key={person._id}
-                        to={`/users/${person._id}`}
-                        onClick={() => setFollowModal(null)}
-                        className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-[#F5EFE3] transition-colors group"
-                      >
-                        <div className="w-9 h-9 bg-[#F0EAD6] border border-[#DDD3B8] rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-gray-700">
-                            {person.name?.charAt(0)?.toUpperCase() || '?'}
-                          </span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700">
-                          {person.name}
-                        </span>
-                        <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </Link>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
+      <style>{`
+        @media (max-width: 768px) {
+          .profile-shelves-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .milestone-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

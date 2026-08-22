@@ -1,57 +1,101 @@
 import { useEffect, useState, useRef } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { fetchBooks } from '../lib/api';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
+import Avatar, { genConfig } from 'react-nice-avatar';
+import { useAuth } from '../contexts/AuthContext';
+import { fetchBooks, fetchProfile, fetchMyReviews, fetchReadingList, fetchFavorites } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 
 const GENRES = ['Fiction', 'Non-Fiction', 'Mystery', 'Science Fiction', 'Fantasy', 'Romance', 'Thriller', 'Biography', 'Self-Help', 'Historical Fiction', 'Horror', 'Poetry', 'Other'];
 const LIMIT = 12;
 
+const GENRE_COLORS = {
+  Fiction: { bg: '#f3e8ff', color: '#6b21a8', border: '#e9d5ff' },
+  'Non-Fiction': { bg: '#e0f2fe', color: '#0369a1', border: '#bae6fd' },
+  Mystery: { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
+  'Science Fiction': { bg: '#e0e7ff', color: '#3730a3', border: '#c7d2fe' },
+  Fantasy: { bg: '#fae8ff', color: '#86198f', border: '#f5d0fe' },
+  Romance: { bg: '#ffe4e6', color: '#9f1239', border: '#fecdd3' },
+  Thriller: { bg: '#fee2e2', color: '#991b1b', border: '#fecaca' },
+  Biography: { bg: '#f1f5f9', color: '#334155', border: '#e2e8f0' },
+  'Self-Help': { bg: '#dcfce7', color: '#166534', border: '#bbf7d0' },
+  'Historical Fiction': { bg: '#fef9c3', color: '#854d0e', border: '#fef08a' },
+  Horror: { bg: '#f3f4f6', color: '#1f2937', border: '#e5e7eb' },
+  Poetry: { bg: '#fdf2f8', color: '#9d174d', border: '#fce7f3' },
+  Other: { bg: '#f3f4f6', color: '#4b5563', border: '#e5e7eb' },
+};
+
+// Procedural book cover gradient generator for books without cover images
+const getBookCoverGradient = (title = '') => {
+  const gradients = [
+    'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+    'linear-gradient(135deg, #312e81 0%, #1e1b4b 100%)',
+    'linear-gradient(135deg, #134e4a 0%, #042f2e 100%)',
+    'linear-gradient(135deg, #701a75 0%, #4a044e 100%)',
+    'linear-gradient(135deg, #7c2d12 0%, #451a03 100%)',
+    'linear-gradient(135deg, #1e3a8a 0%, #172554 100%)',
+  ];
+  const charCodeSum = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return gradients[charCodeSum % gradients.length];
+};
+
 export default function UserDashboard() {
-  // Filter state
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [genre, setGenre] = useState('All');
   const [minRating, setMinRating] = useState('');
   const [sort, setSort] = useState('newest');
-
   const sentinelRef = useRef(null);
 
-  // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
 
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-    isLoading,
-    isError,
-    refetch,
-  } = useInfiniteQuery({
+  // Profile data for hero
+  const { data: profileData = {} } = useQuery({
+    queryKey: queryKeys.profile(),
+    queryFn: fetchProfile,
+    enabled: !!user,
+  });
+
+  // Stats queries
+  const { data: myReviewsData } = useQuery({
+    queryKey: ['myReviews', { page: 1, limit: 1 }],
+    queryFn: () => fetchMyReviews({ page: 1, limit: 1 }),
+    enabled: !!user,
+  });
+
+  const { data: readingListData } = useQuery({
+    queryKey: ['readingList'],
+    queryFn: fetchReadingList,
+    enabled: !!user,
+  });
+
+  const { data: favoritesData } = useQuery({
+    queryKey: ['favorites'],
+    queryFn: fetchFavorites,
+    enabled: !!user,
+  });
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, refetch } = useInfiniteQuery({
     queryKey: queryKeys.books({ search: debouncedSearch, genre, minRating, sort }),
-    queryFn: ({ pageParam = 1 }) =>
-      fetchBooks({ page: pageParam, limit: LIMIT, search: debouncedSearch, genre, minRating, sort }),
-    getNextPageParam: (lastPage) => lastPage.hasNextPage ? lastPage.page + 1 : undefined,
+    queryFn: ({ pageParam = 1 }) => fetchBooks({ page: pageParam, limit: LIMIT, search: debouncedSearch, genre, minRating, sort }),
+    getNextPageParam: (lastPage) => (lastPage.hasNextPage ? lastPage.page + 1 : undefined),
     initialPageParam: 1,
   });
 
-  const books = data?.pages.flatMap(p => p.data) ?? [];
+  const books = data?.pages.flatMap((p) => p.data) ?? [];
   const totalCount = data?.pages[0]?.totalCount ?? 0;
 
-  // IntersectionObserver for infinite scroll
   useEffect(() => {
     const sentinel = sentinelRef.current;
     if (!sentinel) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && !isLoading) {
-          fetchNextPage();
-        }
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && !isLoading) fetchNextPage();
       },
       { threshold: 0.1 }
     );
@@ -67,274 +111,669 @@ export default function UserDashboard() {
     setSort('newest');
   };
 
-  const activeFilterCount = [
-    debouncedSearch !== '',
-    genre !== 'All',
-    minRating !== '',
-    sort !== 'newest',
-  ].filter(Boolean).length;
+  const activeFilterCount = [debouncedSearch !== '', genre !== 'All', minRating !== '', sort !== 'newest'].filter(Boolean).length;
 
-  const renderStars = (rating) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
+  const memberSince = profileData?.createdAt
+    ? new Date(profileData.createdAt).getFullYear()
+    : new Date().getFullYear();
 
-    for (let i = 0; i < 5; i++) {
-      if (i < fullStars) {
-        stars.push(
-          <svg key={i} className="w-4 h-4 text-amber-400 fill-current" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
-        );
-      } else if (i === fullStars && hasHalfStar) {
-        stars.push(
-          <svg key={i} className="w-4 h-4 text-amber-400" viewBox="0 0 20 20">
-            <defs>
-              <linearGradient id="half-star">
-                <stop offset="50%" stopColor="currentColor" />
-                <stop offset="50%" stopColor="rgb(209 213 219)" />
-              </linearGradient>
-            </defs>
-            <path fill="url(#half-star)" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
-        );
-      } else {
-        stars.push(
-          <svg key={i} className="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-          </svg>
-        );
-      }
-    }
-    return stars;
-  };
+  const finishedBooksCount = readingListData?.filter((b) => b.status === 'finished')?.length ?? 0;
+  const authoredReviewsCount = myReviewsData?.totalCount ?? 0;
+  const favCount = favoritesData?.length ?? 0;
+
+  const avatarConfig = genConfig(profileData?.name || user?.name || 'reader-avatar');
 
   return (
-    <div className="min-h-screen bg-[#FAF6EE]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div style={{ backgroundColor: '#f8f8f8', minHeight: '100vh', fontFamily: "'Inter', sans-serif" }}>
 
-        {/* Page Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Book Library</h1>
-          <p className="text-gray-500 mt-1">Discover books and share your thoughts with fellow readers</p>
+      {/* ── HERO BANNER ────────────────────────────────────────── */}
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          backgroundImage:
+            'linear-gradient(#e5e5e5 1px, transparent 1px), linear-gradient(90deg, #e5e5e5 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+          borderBottom: '1px solid #e5e5e5',
+          padding: '48px 0 36px',
+        }}
+      >
+        <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '24px' }}>
+
+            {/* Profile Identity */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div
+                style={{
+                  width: '68px',
+                  height: '68px',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: '2px solid #0a0a0a',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+                  flexShrink: 0,
+                  backgroundColor: '#f3f3f3',
+                }}
+              >
+                <Avatar style={{ width: '100%', height: '100%' }} {...avatarConfig} />
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                  <h1 style={{ fontSize: '22px', fontWeight: 900, color: '#0a0a0a', letterSpacing: '-0.02em', margin: 0 }}>
+                    {profileData?.name || user?.name || 'Reader'}
+                  </h1>
+                  <span
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: user?.role === 'admin' ? '#fef2f2' : '#f0fdf4',
+                      color: user?.role === 'admin' ? '#b91c1c' : '#15803d',
+                      border: `1px solid ${user?.role === 'admin' ? '#fecaca' : '#bbf7d0'}`,
+                    }}
+                  >
+                    {user?.role === 'admin' ? '🛡️ Admin' : '📖 Reader'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: '#6b7280', flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Member since {memberSince}
+                  </span>
+                  <span>•</span>
+                  <span>{profileData?.email || user?.email}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <Link
+                to="/profile"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: '#0a0a0a',
+                  backgroundColor: '#ffffff',
+                  border: '1.5px solid #0a0a0a',
+                  borderRadius: '4px',
+                  padding: '9px 18px',
+                  textDecoration: 'none',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0a0a0a'; e.currentTarget.style.color = '#ffffff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ffffff'; e.currentTarget.style.color = '#0a0a0a'; }}
+              >
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
+                Profile &amp; Shelves
+              </Link>
+
+              <button
+                onClick={() => document.getElementById('book-library')?.scrollIntoView({ behavior: 'smooth' })}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: '#ffffff',
+                  backgroundColor: '#0a0a0a',
+                  border: '1.5px solid #0a0a0a',
+                  borderRadius: '4px',
+                  padding: '9px 18px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#262626'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#0a0a0a'; }}
+              >
+                Explore Library ↓
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* ── MAIN DASHBOARD BODY ─────────────────────────────────── */}
+      <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '36px 1.5rem 80px' }}>
+
+        {/* ── SECTION: YOUR PROGRESS METRICS ─────────────────────── */}
+        <div style={{ marginBottom: '40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#0a0a0a', margin: 0 }}>
+              Reading Statistics
+            </p>
+            <span style={{ fontSize: '11px', color: '#9ca3af' }}>Real-time reader telemetry</span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 1fr)',
+              gap: '16px',
+            }}
+            className="stats-grid-responsive"
+          >
+            {/* Stat 1: Books Read */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1.5px solid #e5e5e5',
+                borderRadius: '8px',
+                padding: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', margin: '0 0 6px' }}>
+                  Books Finished
+                </p>
+                <p style={{ fontSize: '28px', fontWeight: 900, color: '#0a0a0a', margin: 0, letterSpacing: '-0.03em' }}>
+                  {finishedBooksCount}
+                </p>
+              </div>
+              <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                📚
+              </div>
+            </div>
+
+            {/* Stat 2: Reviews Written */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1.5px solid #e5e5e5',
+                borderRadius: '8px',
+                padding: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', margin: '0 0 6px' }}>
+                  Reviews Written
+                </p>
+                <p style={{ fontSize: '28px', fontWeight: 900, color: '#0a0a0a', margin: 0, letterSpacing: '-0.03em' }}>
+                  {authoredReviewsCount}
+                </p>
+              </div>
+              <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                ✍️
+              </div>
+            </div>
+
+            {/* Stat 3: Community Rating */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1.5px solid #e5e5e5',
+                borderRadius: '8px',
+                padding: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', margin: '0 0 6px' }}>
+                  Library Catalog
+                </p>
+                <p style={{ fontSize: '28px', fontWeight: 900, color: '#0a0a0a', margin: 0, letterSpacing: '-0.03em' }}>
+                  {totalCount}
+                </p>
+              </div>
+              <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#fefce8', border: '1px solid #fef08a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                ⭐
+              </div>
+            </div>
+
+            {/* Stat 4: Favorites */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                border: '1.5px solid #e5e5e5',
+                borderRadius: '8px',
+                padding: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <div>
+                <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9ca3af', margin: '0 0 6px' }}>
+                  Saved Favorites
+                </p>
+                <p style={{ fontSize: '28px', fontWeight: 900, color: '#0a0a0a', margin: 0, letterSpacing: '-0.03em' }}>
+                  {favCount}
+                </p>
+              </div>
+              <div style={{ width: '40px', height: '40px', borderRadius: '8px', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                ❤️
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Search & Filter Panel */}
-        <div className="bg-white border border-[#E8E0CE] rounded-xl p-5 shadow-sm mb-6">
-          <div className="flex flex-col gap-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* ── SECTION: BOOK LIBRARY ───────────────────────────────── */}
+        <div id="book-library">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <p style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#0a0a0a', margin: 0 }}>
+              Curated Book Catalog
+            </p>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>
+              Showing {books.length} of {totalCount} books
+            </span>
+          </div>
+
+          {/* Filter Bar */}
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1.5px solid #e5e5e5',
+              borderRadius: '8px',
+              padding: '14px 18px',
+              marginBottom: '24px',
+              display: 'flex',
+              gap: '12px',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+            }}
+          >
+            {/* Search Input */}
+            <div style={{ position: 'relative', flex: '1', minWidth: '220px' }}>
+              <svg
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }}
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by title, author, or description..."
-                className="w-full pl-10 pr-10 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
+                placeholder="Search by title, author, keyword..."
+                style={{
+                  width: '100%',
+                  padding: '9px 12px 9px 34px',
+                  border: '1px solid #e5e5e5',
+                  borderRadius: '4px',
+                  fontSize: '13px',
+                  color: '#0a0a0a',
+                  outline: 'none',
+                  fontFamily: "'Inter', sans-serif",
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.15s ease',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = '#0a0a0a')}
+                onBlur={(e) => (e.target.style.borderColor = '#e5e5e5')}
               />
-              {search && (
-                <button
-                  onClick={() => setSearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
             </div>
 
-            {/* Filter Row */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              {/* Genre */}
-              <div className="flex-1 min-w-0">
-                <select
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
-                >
-                  <option value="All">All Genres</option>
-                  {GENRES.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </div>
-
-              {/* Min Rating */}
-              <div className="flex-1 min-w-0">
-                <select
-                  value={minRating}
-                  onChange={(e) => setMinRating(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
-                >
-                  <option value="">Any Rating</option>
-                  <option value="1">1+ Stars</option>
-                  <option value="2">2+ Stars</option>
-                  <option value="3">3+ Stars</option>
-                  <option value="4">4+ Stars</option>
-                  <option value="5">5 Stars</option>
-                </select>
-              </div>
-
-              {/* Sort */}
-              <div className="flex-1 min-w-0">
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-[#E8E0CE] rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-colors"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="highest_rated">Highest Rated</option>
-                  <option value="lowest_rated">Lowest Rated</option>
-                </select>
-              </div>
-
-              {/* Clear Filters */}
-              {activeFilterCount > 0 && (
-                <button
-                  onClick={clearFilters}
-                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-100 hover:border-gray-400 active:scale-[0.98] transition-all duration-150 whitespace-nowrap"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Clear ({activeFilterCount})
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Books Grid */}
-        {isLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className="bg-white border border-[#E8E0CE] rounded-xl overflow-hidden animate-pulse">
-                <div className="w-full h-48 bg-[#F0EAD6]" />
-                <div className="p-3 space-y-2">
-                  <div className="h-3.5 bg-[#E8E0CE] rounded w-3/4" />
-                  <div className="h-3 bg-[#E8E0CE] rounded w-1/2" />
-                  <div className="h-3 bg-[#E8E0CE] rounded w-1/3" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : isError ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <p className="text-gray-900 font-medium">Failed to load books. Please try again later.</p>
-            <button
-              onClick={() => refetch()}
-              className="bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
+            {/* Genre Select */}
+            <select
+              value={genre}
+              onChange={(e) => setGenre(e.target.value)}
+              style={{
+                padding: '9px 12px',
+                border: '1px solid #e5e5e5',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#374151',
+                backgroundColor: '#ffffff',
+                cursor: 'pointer',
+                fontFamily: "'Inter', sans-serif",
+                outline: 'none',
+              }}
             >
-              Try Again
-            </button>
-          </div>
-        ) : books.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-gray-500 text-lg font-medium mb-1">
-              {activeFilterCount > 0 ? 'No books match your filters' : 'No books available yet'}
-            </p>
-            <p className="text-gray-400 text-sm mb-4">
-              {activeFilterCount > 0 ? 'Try adjusting your search or filters.' : 'Check back later for new additions.'}
-            </p>
+              <option value="All">All Genres</option>
+              {GENRES.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+
+            {/* Rating Select */}
+            <select
+              value={minRating}
+              onChange={(e) => setMinRating(e.target.value)}
+              style={{
+                padding: '9px 12px',
+                border: '1px solid #e5e5e5',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#374151',
+                backgroundColor: '#ffffff',
+                cursor: 'pointer',
+                fontFamily: "'Inter', sans-serif",
+                outline: 'none',
+              }}
+            >
+              <option value="">Any Rating</option>
+              {[4, 3, 2, 1].map((n) => (
+                <option key={n} value={n}>{n}+ Stars</option>
+              ))}
+            </select>
+
+            {/* Sort Select */}
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              style={{
+                padding: '9px 12px',
+                border: '1px solid #e5e5e5',
+                borderRadius: '4px',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#374151',
+                backgroundColor: '#ffffff',
+                cursor: 'pointer',
+                fontFamily: "'Inter', sans-serif",
+                outline: 'none',
+              }}
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="highest_rated">Highest Rated</option>
+              <option value="lowest_rated">Lowest Rated</option>
+            </select>
+
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="bg-gray-900 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm hover:bg-gray-800 hover:shadow-md active:scale-[0.98] transition-all duration-150"
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  color: '#b91c1c',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '4px',
+                  padding: '9px 14px',
+                  cursor: 'pointer',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                }}
               >
-                Clear Filters
+                Reset ({activeFilterCount})
               </button>
             )}
           </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {books.map((book) => (
-                <Link to={`/books/${book._id}`} key={book._id} className="group">
-                  <div className="bg-white border border-[#E8E0CE] rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
-                    {/* Cover + Info row */}
-                    <div className="flex gap-4 flex-1">
-                      {/* Cover Image */}
-                      <div className="flex-shrink-0">
-                        {book.coverImage ? (
-                          <img
-                            src={book.coverImage}
-                            alt={book.title}
-                            className="w-14 h-20 object-cover rounded-lg border border-[#E8E0CE]"
-                            onError={(e) => {
-                              e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
-                        <div
-                          className={`w-14 h-20 bg-[#F0EAD6] rounded-lg border border-[#E8E0CE] items-center justify-center ${book.coverImage ? 'hidden' : 'flex'}`}
-                        >
-                          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                          </svg>
-                        </div>
-                      </div>
 
-                      {/* Book Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h2 className="text-base font-semibold text-gray-900 line-clamp-2 leading-snug">
-                            {book.title}
-                          </h2>
-                        </div>
-                        <p className="text-sm text-gray-500 mb-2">by {book.author}</p>
-                        {book.genre && (
-                          <span className="inline-block bg-[#F0EAD6] text-gray-700 text-xs font-medium px-2.5 py-1 rounded-md">
-                            {book.genre}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Rating row */}
-                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#E8E0CE]">
-                      <div className="flex items-center gap-1.5">
-                        {book.averageRating != null ? (
-                          <>
-                            <div className="flex items-center gap-0.5">
-                              {renderStars(book.averageRating)}
-                            </div>
-                            <span className="text-sm font-medium text-gray-700">
-                              {book.averageRating.toFixed(1)}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">No ratings yet</span>
-                        )}
-                      </div>
-                      <span className="text-xs text-gray-400">
-                        {book.reviewCount || 0} {book.reviewCount === 1 ? 'review' : 'reviews'}
-                      </span>
-                    </div>
-                  </div>
-                </Link>
+          {/* Book Cards Grid */}
+          {isLoading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }} className="books-responsive">
+              {[...Array(6)].map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    backgroundColor: '#ffffff',
+                    border: '1.5px solid #e5e5e5',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    height: '140px',
+                    opacity: 0.6,
+                    animation: 'pulse 1.5s infinite ease-in-out',
+                  }}
+                />
               ))}
             </div>
-
-            {/* Infinite scroll sentinel */}
-            <div ref={sentinelRef} className="py-8 flex justify-center">
-              {isFetchingNextPage && (
-                <div className="flex items-center gap-2.5 text-gray-500">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-900 border-t-transparent" />
-                  <span className="text-sm">Loading more books...</span>
-                </div>
-              )}
-              {!hasNextPage && books.length > 0 && !isFetchingNextPage && (
-                <p className="text-gray-400 text-sm">
-                  Showing all {totalCount} {totalCount === 1 ? 'book' : 'books'}
-                </p>
+          ) : isError ? (
+            <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #e5e5e5', borderRadius: '8px', padding: '48px 24px', textAlign: 'center' }}>
+              <p style={{ color: '#0a0a0a', marginBottom: '14px', fontWeight: 700 }}>Unable to load books from server.</p>
+              <button
+                onClick={() => refetch()}
+                style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', backgroundColor: '#0a0a0a', color: '#fff', border: 'none', borderRadius: '4px', padding: '9px 18px', cursor: 'pointer' }}
+              >
+                Try Again
+              </button>
+            </div>
+          ) : books.length === 0 ? (
+            <div style={{ backgroundColor: '#ffffff', border: '1.5px solid #e5e5e5', borderRadius: '8px', padding: '48px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: '36px', marginBottom: '10px' }}>🔍</div>
+              <p style={{ fontWeight: 800, color: '#0a0a0a', marginBottom: '4px', fontSize: '15px' }}>
+                {activeFilterCount > 0 ? 'No books match your filters' : 'No books in library'}
+              </p>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+                {activeFilterCount > 0 ? 'Try searching for a different title, author, or genre.' : 'Check back later for new additions.'}
+              </p>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={clearFilters}
+                  style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', backgroundColor: '#0a0a0a', color: '#fff', border: 'none', borderRadius: '4px', padding: '9px 18px', cursor: 'pointer' }}
+                >
+                  Clear All Filters
+                </button>
               )}
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+                  gap: '20px',
+                }}
+                className="books-responsive"
+              >
+                {books.map((book) => {
+                  const genreStyle = GENRE_COLORS[book.genre] || GENRE_COLORS.Other;
+                  const coverBg = getBookCoverGradient(book.title);
+
+                  return (
+                    <Link
+                      to={`/books/${book._id}`}
+                      key={book._id}
+                      style={{ textDecoration: 'none', display: 'flex' }}
+                    >
+                      <div
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#ffffff',
+                          border: '1.5px solid #e5e5e5',
+                          borderRadius: '8px',
+                          padding: '20px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 4px rgba(0,0,0,0.03)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#0a0a0a';
+                          e.currentTarget.style.transform = 'translateY(-3px)';
+                          e.currentTarget.style.boxShadow = '0 10px 24px -4px rgba(0,0,0,0.08)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#e5e5e5';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.03)';
+                        }}
+                      >
+                        {/* Book Top: Cover + Info */}
+                        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+
+                          {/* Book 3D Cover */}
+                          <div
+                            style={{
+                              flexShrink: 0,
+                              width: '64px',
+                              height: '92px',
+                              borderRadius: '4px',
+                              overflow: 'hidden',
+                              border: '1px solid #e5e5e5',
+                              boxShadow: '2px 3px 8px rgba(0,0,0,0.12)',
+                              position: 'relative',
+                              backgroundColor: '#1e293b',
+                            }}
+                          >
+                            {book.coverImage ? (
+                              <img
+                                src={book.coverImage}
+                                alt={book.title}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  background: coverBg,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  padding: '8px 6px',
+                                  boxSizing: 'border-box',
+                                  color: '#ffffff',
+                                }}
+                              >
+                                <span style={{ fontSize: '8px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>LitLens</span>
+                                <span style={{ fontSize: '14px', alignSelf: 'center' }}>📖</span>
+                                <span style={{ fontSize: '7px', fontWeight: 700, lineHeight: 1.1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                                  {book.title}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Book Details */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p
+                              style={{
+                                fontSize: '14px',
+                                fontWeight: 800,
+                                color: '#0a0a0a',
+                                marginBottom: '4px',
+                                lineHeight: 1.3,
+                                overflow: 'hidden',
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                              }}
+                            >
+                              {book.title}
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              by {book.author || 'Unknown Author'}
+                            </p>
+                            {book.genre && (
+                              <span
+                                style={{
+                                  display: 'inline-block',
+                                  fontSize: '10px',
+                                  fontWeight: 700,
+                                  letterSpacing: '0.06em',
+                                  textTransform: 'uppercase',
+                                  backgroundColor: genreStyle.bg,
+                                  color: genreStyle.color,
+                                  border: `1px solid ${genreStyle.border}`,
+                                  padding: '2px 7px',
+                                  borderRadius: '4px',
+                                }}
+                              >
+                                {book.genre}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Rating Row & Review Count */}
+                        <div
+                          style={{
+                            borderTop: '1px solid #f3f3f3',
+                            paddingTop: '12px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            {book.averageRating != null ? (
+                              <>
+                                <span style={{ color: '#f59e0b', fontSize: '13px' }}>
+                                  {'★'.repeat(Math.round(book.averageRating))}
+                                  {'☆'.repeat(5 - Math.round(book.averageRating))}
+                                </span>
+                                <span style={{ fontSize: '12px', fontWeight: 800, color: '#0a0a0a' }}>
+                                  {Number(book.averageRating).toFixed(1)}
+                                </span>
+                              </>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic' }}>
+                                No reviews yet
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 500 }}>
+                            {book.reviewCount || 0} {book.reviewCount === 1 ? 'review' : 'reviews'}
+                          </span>
+                        </div>
+
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* Infinite Scroll Sentinel */}
+              <div ref={sentinelRef} style={{ padding: '36px 0', display: 'flex', justifyContent: 'center' }}>
+                {isFetchingNextPage && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#6b7280', fontSize: '13px' }}>
+                    <div style={{ width: '18px', height: '18px', border: '2px solid #0a0a0a', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+                    Loading more books...
+                  </div>
+                )}
+                {!hasNextPage && books.length > 0 && !isFetchingNextPage && (
+                  <p style={{ fontSize: '12px', color: '#9ca3af', letterSpacing: '0.06em' }}>
+                    Showing all {totalCount} {totalCount === 1 ? 'book' : 'books'}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 0.3; } }
+        @media (max-width: 960px) {
+          .stats-grid-responsive { grid-template-columns: repeat(2, 1fr) !important; }
+          .books-responsive { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width: 640px) {
+          .stats-grid-responsive { grid-template-columns: 1fr !important; }
+          .books-responsive { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -12,12 +12,12 @@ exports.countFollowing = (userId) => Follow.countDocuments({ follower: userId })
 
 exports.getFollowers = (userId) =>
   Follow.find({ following: userId })
-    .populate('follower', 'name')
+    .populate('follower', 'name email')
     .sort({ createdAt: -1 });
 
 exports.getFollowing = (userId) =>
   Follow.find({ follower: userId })
-    .populate('following', 'name')
+    .populate('following', 'name email')
     .sort({ createdAt: -1 });
 
 exports.deleteMany = (filter, session) =>

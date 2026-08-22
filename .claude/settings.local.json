@@ -5,7 +5,9 @@
       "Bash(npx jest:*)",
       "Bash(npm i:*)",
       "Bash(npx vitest:*)",
-      "Bash(npx playwright:*)"
+      "Bash(npx playwright:*)",
+      "Bash(ls backend/services/)",
+      "Bash(grep -rn \"Limiter\" backend/app.js backend/routes/)"
     ]
   }
 }

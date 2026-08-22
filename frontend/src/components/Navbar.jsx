@@ -1,12 +1,14 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import Avatar, { genConfig } from 'react-nice-avatar';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchProfile } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { data: profileUser = {} } = useQuery({
@@ -15,221 +17,171 @@ export default function Navbar() {
     enabled: !!user,
   });
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
-  const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false);
-  };
+  const navLinks = [
+    { to: '/', label: 'HOME' },
+    ...(user ? [{ to: '/dashboard', label: 'DASHBOARD' }] : []),
+    { to: '/about', label: 'ABOUT' },
+    { to: '/leaderboard', label: 'LEADERBOARD' },
+    ...(user ? [{ to: '/profile', label: 'PROFILE' }] : []),
+  ];
+
+  const isActive = (to) => location.pathname === to;
 
   return (
-    <nav className="bg-white border-b border-[#E8E0CE] sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <nav style={{ backgroundColor: '#ffffff', borderBottom: '1px solid #e5e5e5', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '56px' }}>
 
-          {/* Logo */}
-          <Link
-            to="/"
-            className="flex items-center space-x-2 text-xl font-bold text-gray-900 hover:text-gray-700 transition-colors"
-          >
-            <img src="/img/litlens.jpeg" alt="LitLens" className="h-8 w-8 rounded-full object-cover" />
-            <span>LitLens</span>
+          {/* ── Logo (stacked two-line, MicroGig style) ──────────── */}
+          <Link to="/" style={{ textDecoration: 'none', lineHeight: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <img src="/img/litlens.jpeg" alt="LitLens" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '0.04em', color: '#0a0a0a', lineHeight: 1.1, textTransform: 'uppercase' }}>LitLens</div>
+              <div style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.12em', color: '#6b7280', textTransform: 'uppercase', lineHeight: 1.1 }}>Reviews</div>
+            </div>
           </Link>
 
-          {/* Desktop Navigation Links */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link
-              to="/"
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-            >
-              Home
-            </Link>
-
-            {user && (
-              <Link
-                to="/dashboard"
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-              >
-                Dashboard
-              </Link>
-            )}
-
-            <Link
-              to="/about"
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-            >
-              About
-            </Link>
-
-            <Link
-              to="/leaderboard"
-              className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-            >
-              Leaderboard
-            </Link>
-
-            {user && (
-              <Link
-                to="/profile"
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors"
-              >
-                Profile
-              </Link>
-            )}
+          {/* ── Desktop nav links with / separators ─────────────── */}
+          <div className="hidden md:flex" style={{ alignItems: 'center', gap: '0' }}>
+            {navLinks.map((link, i) => (
+              <div key={link.to} style={{ display: 'flex', alignItems: 'center' }}>
+                {i > 0 && (
+                  <span style={{ color: '#d1d5db', fontSize: '13px', margin: '0 6px', userSelect: 'none' }}>/</span>
+                )}
+                <Link
+                  to={link.to}
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: isActive(link.to) ? '#0a0a0a' : '#6b7280',
+                    textDecoration: 'none',
+                    padding: '4px 2px',
+                    borderBottom: isActive(link.to) ? '2px solid #0a0a0a' : '2px solid transparent',
+                    transition: 'color 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#0a0a0a'; }}
+                  onMouseLeave={e => { if (!isActive(link.to)) e.currentTarget.style.color = '#6b7280'; }}
+                >
+                  {link.label}
+                </Link>
+              </div>
+            ))}
           </div>
 
-          {/* Desktop Authentication */}
-          <div className="hidden md:flex items-center space-x-3">
+          {/* ── Desktop right actions ────────────────────────────── */}
+          <div className="hidden md:flex" style={{ alignItems: 'center', gap: '12px' }}>
             {!user ? (
               <>
                 <Link
                   to="/login"
-                  className="border-2 border-gray-900 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
+                  style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', textDecoration: 'none', padding: '6px 12px', border: '1px solid #e5e5e5', borderRadius: '4px', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#0a0a0a'; e.currentTarget.style.color = '#0a0a0a'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e5e5'; e.currentTarget.style.color = '#6b7280'; }}
                 >
-                  Login
+                  Log In
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm hover:shadow-md hover:bg-gray-800 active:scale-[0.98] transition-all duration-150"
+                  style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#ffffff', textDecoration: 'none', padding: '6px 14px', backgroundColor: '#0a0a0a', borderRadius: '4px', border: '1px solid #0a0a0a', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#333'; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#0a0a0a'; }}
                 >
                   Register
                 </Link>
               </>
             ) : (
-              <div className="flex items-center space-x-4">
-                <Link to="/profile" className="flex items-center space-x-2 group">
-                  <div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-semibold">
-                    {(profileUser?.name || profileUser?.email || 'U')[0].toUpperCase()}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* Bell icon */}
+                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', padding: '4px' }}>
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </button>
+
+                {/* Avatar */}
+                <Link to="/profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '1.5px solid #0a0a0a',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      cursor: 'pointer',
+                      backgroundColor: '#f3f3f3',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Avatar style={{ width: '100%', height: '100%' }} {...genConfig(profileUser?.name || profileUser?.email || user?.name || 'reader')} />
                   </div>
-                  <span className="text-gray-700 text-sm font-medium hidden lg:block group-hover:text-gray-900 transition-colors">
-                    {profileUser?.name || profileUser?.email || 'User'}
-                  </span>
                 </Link>
 
+                {/* Sign out */}
                 <button
                   onClick={logout}
-                  className="text-gray-500 text-sm font-medium hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 active:scale-[0.98] transition-all duration-150"
+                  style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', transition: 'color 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#0a0a0a'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}
                 >
-                  Logout
+                  Sign Out
                 </button>
               </div>
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <button
-              onClick={toggleMobileMenu}
-              className="text-gray-600 hover:text-gray-900 focus:outline-none p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              aria-label="Toggle mobile menu"
-            >
-              {isMobileMenuOpen ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              )}
-            </button>
-          </div>
+          {/* ── Mobile hamburger ─────────────────────────────────── */}
+          <button
+            className="md:hidden"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0a0a0a', padding: '4px' }}
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? (
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
 
-        {/* Mobile menu */}
-        <div className={`md:hidden transition-all duration-200 ease-in-out ${
-          isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
-        }`}>
-          <div className="border-t border-[#E8E0CE] py-3 space-y-1 bg-white">
-            <Link
-              to="/"
-              onClick={closeMobileMenu}
-              className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-            >
-              Home
-            </Link>
-
-            {user && (
+        {/* ── Mobile menu ──────────────────────────────────────────── */}
+        {isMobileMenuOpen && (
+          <div style={{ borderTop: '1px solid #e5e5e5', paddingTop: '12px', paddingBottom: '16px', backgroundColor: '#ffffff' }}>
+            {navLinks.map(link => (
               <Link
-                to="/dashboard"
+                key={link.to}
+                to={link.to}
                 onClick={closeMobileMenu}
-                className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+                style={{ display: 'block', fontSize: '11px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: isActive(link.to) ? '#0a0a0a' : '#6b7280', textDecoration: 'none', padding: '10px 4px', borderBottom: '1px solid #f3f3f3' }}
               >
-                Dashboard
+                {link.label}
               </Link>
-            )}
-
-            <Link
-              to="/about"
-              onClick={closeMobileMenu}
-              className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-            >
-              About
-            </Link>
-
-            <Link
-              to="/leaderboard"
-              onClick={closeMobileMenu}
-              className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-            >
-              Leaderboard
-            </Link>
-
-            {user && (
-              <Link
-                to="/profile"
-                onClick={closeMobileMenu}
-                className="block text-gray-600 hover:text-gray-900 font-medium py-2.5 px-4 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-              >
-                Profile
-              </Link>
-            )}
-
-            {/* Mobile Authentication */}
-            <div className="border-t border-[#E8E0CE] pt-3 mt-2">
+            ))}
+            <div style={{ paddingTop: '12px', display: 'flex', gap: '10px' }}>
               {!user ? (
-                <div className="space-y-2 px-4">
-                  <Link
-                    to="/login"
-                    onClick={closeMobileMenu}
-                    className="block border-2 border-gray-900 text-gray-900 py-2.5 px-4 rounded-lg font-medium text-sm text-center hover:bg-gray-900 hover:text-white active:scale-[0.98] transition-all duration-150"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    to="/register"
-                    onClick={closeMobileMenu}
-                    className="block bg-gray-900 text-white py-2.5 px-4 rounded-lg font-medium text-sm text-center shadow-sm hover:shadow-md hover:bg-gray-800 active:scale-[0.98] transition-all duration-150"
-                  >
-                    Register
-                  </Link>
-                </div>
+                <>
+                  <Link to="/login" onClick={closeMobileMenu} style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#0a0a0a', textDecoration: 'none', padding: '8px 14px', border: '1px solid #0a0a0a', borderRadius: '4px' }}>Log In</Link>
+                  <Link to="/register" onClick={closeMobileMenu} style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#fff', textDecoration: 'none', padding: '8px 14px', backgroundColor: '#0a0a0a', borderRadius: '4px' }}>Register</Link>
+                </>
               ) : (
-                <div className="space-y-1">
-                  <div className="flex items-center px-4 py-2">
-                    <div className="w-8 h-8 bg-gray-900 text-white rounded-full flex items-center justify-center text-sm font-semibold mr-3">
-                      {(profileUser?.name || profileUser?.email || 'U')[0].toUpperCase()}
-                    </div>
-                    <span className="text-gray-700 font-medium text-sm">
-                      {profileUser?.name || profileUser?.email || 'User'}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      logout();
-                      closeMobileMenu();
-                    }}
-                    className="w-full text-left text-gray-500 text-sm font-medium hover:text-gray-900 py-2.5 px-4 rounded-lg hover:bg-gray-100 active:scale-[0.98] transition-all duration-150"
-                  >
-                    Logout
-                  </button>
-                </div>
+                <button onClick={() => { logout(); closeMobileMenu(); }} style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0' }}>
+                  Sign Out
+                </button>
               )}
             </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
   );

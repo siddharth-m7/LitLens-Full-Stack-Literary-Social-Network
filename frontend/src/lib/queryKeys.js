@@ -17,7 +17,7 @@ export const queryKeys = {
   // Users
   profile: () => ['profile'],
   publicProfile: (id) => ['users', id],
-  leaderboard: () => ['leaderboard'],
+  leaderboard: (period = 'all_time') => ['leaderboard', period],
 
   // Admin
   adminUsers: () => ['admin', 'users'],
