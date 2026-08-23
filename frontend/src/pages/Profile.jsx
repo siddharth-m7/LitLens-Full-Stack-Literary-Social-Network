@@ -379,7 +379,7 @@ export default function Profile() {
               <p style={{ fontSize: '13px', color: '#6b7280' }}>You have elevated permissions to curate books, moderate reviews, and view system metrics.</p>
             </div>
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/dashboard')}
               style={{ padding: '10px 20px', backgroundColor: '#0a0a0a', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
             >
               Open Admin Center →
